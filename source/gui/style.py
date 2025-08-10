@@ -25,13 +25,20 @@ QHeaderView::section {
     border: 1px solid #555;
 }
 QTabBar::tab {
-    background-color: #3c3f41;
+    background-color:#21657E;
     padding: 6px;
+    font-size: 25px;
+    height: 40px;
+    width: 300px;
+    border: 0.5px solid #BFFDFF;
 }
 QTabBar::tab:selected {
-    background-color: #555;
+    background-color: #00868B;
+    font-size: 30 px
 }
 """
+
+"#BFFDFF"
 
 
 STATUS_COLORS = {

@@ -1,5 +1,6 @@
 import sys
 import os
+from cv2 import QT_FONT_BLACK
 import yaml
 from pathlib import Path
 import time
@@ -10,7 +11,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QTableWidget,
     QTableWidgetItem, QAbstractItemView, QDialog, QSizePolicy, QMessageBox
 )
-
+from PyQt5.QtGui import QFont
 from gui.create_project import CreateProjectDialog, create_project_folder
 from gui.style import DARK_STYLE, STATUS_COLORS
 
@@ -27,11 +28,15 @@ class MainWindow(QMainWindow):
 
         self.project_tab = self.create_project_management_tab()
         self.video_points_tab = QWidget()  # empty container for tab 2 content
+        self.tracking_tab = QWidget()
 
         self.tabs.addTab(self.project_tab, "1. Project Management")
         self.tabs.addTab(self.video_points_tab, "2. Video Points Annotation")
+        self.tabs.addTab(self.tracking_tab, "3. Animal tracking")
 
+        self.tabs.setTabEnabled(2, False)  # Disable tab 3 initially
         self.tabs.setTabEnabled(1, False)  # Disable tab 2 initially
+        
 
         self.setCentralWidget(self.tabs)
         self.showMaximized()
@@ -73,6 +78,7 @@ class MainWindow(QMainWindow):
         for field in (self.project_name, self.author_name, self.experiment_type, self.creation_time, self.number_of_videos, self.overall_status):
             field.setReadOnly(True)
             field.setMinimumWidth(300)
+            field.setFont(QFont("", 16))  # Set font size to 16
 
         yaml_layout = QVBoxLayout()
         yaml_layout.setSpacing(10)
@@ -251,12 +257,19 @@ class MainWindow(QMainWindow):
         def preprocessing_wrapper():
             #self.video_points_container.setVisible(False)
             assert self.dataframe_path is not None, "Path to the project dataframe has not been set."
-            cluster_preprocessing(self.dataframe_path)
-            QMessageBox.information(
-                self,
-                "Preprocessing Status",
-                "Sending all annotated videos to cluster for preprocessing. Check on their status with the 'Check preprocessing status' button."
-            )
+            succes_flag = cluster_preprocessing(self.dataframe_path)
+            if succes_flag:
+                QMessageBox.information(
+                    self,
+                    "Preprocessing Status",
+                    "Sending all annotated videos to cluster for preprocessing. Check on their status with the 'Check preprocessing status' button."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Missing annotation",
+                    "No preprocessing could have been done. Please annotate your data first!"
+                )
             
         def check_preprocessing_status():
             assert self.dataframe_path and isinstance(self.dataframe, pd.DataFrame)

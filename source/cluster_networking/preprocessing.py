@@ -13,12 +13,14 @@ def preprocessing_function_dummy(files_to_process: list[str], keypoints: list[tu
 def preprocessing_function(files_to_process: list[str], keypoints: list[tuple[float, float]], target_folder: str):
     pass
 
-def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable = preprocessing_function_dummy) -> None:
+def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable = preprocessing_function_dummy) -> bool:
     project_folder = os.path.dirname(dataframe_path)
     preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
     completed_files = [Path(file).name for file in os.listdir(preprocessed_folder)]
     
     df = pd.read_csv(dataframe_path)
+    if 'keypoint_positions' not in df.columns:
+        return False
     
     files_to_process = df.loc[df['Status'] == 'Preprocessing ready', 'videos'].to_list()
     mask_done = [Path(file).name in completed_files for file in files_to_process]
@@ -27,3 +29,4 @@ def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable 
     points = [p for p, m in zip(points, mask_done) if not m]
     
     preprocessing_function(files_to_process, points, preprocessed_folder)
+    return True
