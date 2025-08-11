@@ -29,7 +29,7 @@ QTabBar::tab {
     padding: 6px;
     font-size: 25px;
     height: 40px;
-    width: 300px;
+    width: 400px;
     border: 0.5px solid #BFFDFF;
 }
 QTabBar::tab:selected {
@@ -37,9 +37,6 @@ QTabBar::tab:selected {
     font-size: 30 px
 }
 """
-
-"#BFFDFF"
-
 
 STATUS_COLORS = {
     "Loaded": QColor("#3A004B"),               # neutral gray

@@ -150,6 +150,7 @@ class MainWindow(QMainWindow):
         self.tabs.setTabEnabled(1, True)
 
         self.enable_video_points_tab()
+        self.enable_trackres_tab()
 
     def create_project(self):
         dialog = CreateProjectDialog(self)
@@ -168,6 +169,7 @@ class MainWindow(QMainWindow):
             self.tabs.setTabEnabled(2, True)
             self.tabs.setTabEnabled(1, True)
             self.enable_video_points_tab()
+            self.enable_trackres_tab()
             self.btn_load_yaml.setVisible(False)
             self.btn_create_project.setVisible(False)
 
@@ -289,8 +291,7 @@ class MainWindow(QMainWindow):
         btn_check_status.clicked.connect(self.check_preprocessing_status)
         
     def enable_trackres_tab(self):
-        if not self.dataframe_path or not os.path.exists(self.dataframe_path):
-            return
+        
         layout = QVBoxLayout()
         btn_layout = QHBoxLayout()
 
@@ -303,9 +304,10 @@ class MainWindow(QMainWindow):
         layout.addLayout(btn_layout)
 
         self.tracking_tab.setLayout(layout)
+        self.tabs.setTabEnabled(2, True)  # Ensure tab 3 is enabled
 
         def run_tracking():
-            cluster_tracking(self.dataframe_path) #type: ignore
+            cluster_tracking(self.dataframe_path)  # type: ignore
 
         btn_run_tracking.clicked.connect(run_tracking)
 

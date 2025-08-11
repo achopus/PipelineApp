@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 
 from cluster_networking.ssh_handling import slurm_text_preprocessing, ssh_send_command
-from utils import convert_to_linux_path
+from cluster_networking.utils import convert_to_linux_path
 from typing import Callable
 
 def preprocessing_function(project_folder: str, files_to_process: list[str], keypoints: list[str], target_folder: str):
