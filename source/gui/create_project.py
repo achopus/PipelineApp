@@ -104,7 +104,7 @@ class CreateProjectDialog(QDialog):
             field.setStyleSheet("border: 1px solid red;")
             
 def create_project_folder(dialog: CreateProjectDialog) -> Tuple[str, str]:
-    PROJECT_FOLDER = "projects"
+    PROJECT_FOLDER = "//srv-fs.ad.nudz.cz/BV_data/TrackingPRC"
     if not os.path.exists(PROJECT_FOLDER):
         os.mkdir(PROJECT_FOLDER)
     

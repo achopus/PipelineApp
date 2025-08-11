@@ -6,9 +6,10 @@ import json
 import cv2
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout,
-    QMessageBox, QSizePolicy, QFrame, QListWidget, QListWidgetItem
+    QMessageBox, QSizePolicy, QFrame, QListWidget, QListWidgetItem,
+    QApplication
 )
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor, QGuiApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 
 class VideoPointsWidget(QWidget):
@@ -18,8 +19,9 @@ class VideoPointsWidget(QWidget):
         self.df = df.reset_index(drop=True)
         self.video_col = video_col
         self.current_index = 0
-        self.points_per_video = {}  # Dict[int, List[QPoint]]
-        self.points = []  # Current video points
+        self.points_per_video = {}  # Dict[int, List[QPoint]]  (stored as full-resolution coords)
+        self.points = []  # Current video points (full-res coords)
+        self.display_scale = 1.0  # scale factor from full-res -> displayed
 
         # Colors and corner labels
         self.corner_colors = [
@@ -38,8 +40,7 @@ class VideoPointsWidget(QWidget):
 
         # Video display label
         self.video_label = QLabel("Video will display here")
-        #self.video_label.setAlignment('Aling')
-        self.video_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.video_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed) # type: ignore
         left_layout.addWidget(self.video_label)
 
         # Buttons for video navigation
@@ -127,7 +128,7 @@ class VideoPointsWidget(QWidget):
         for i, row in self.df.iterrows():
             filename = row[self.video_col]
             status = row.get("Status", "")
-            item = QListWidgetItem(f"{i+1}. {Path(filename).stem}") # pyright: ignore[reportOperatorIssue]
+            item = QListWidgetItem(f"{i+1}. {Path(filename).stem}") # type: ignore
             if status == "Preprocessing ready":
                 item.setForeground(QColor("white"))
                 item.setBackground(QColor("green"))
@@ -156,6 +157,8 @@ class VideoPointsWidget(QWidget):
 
         if self.cap:
             self.cap.release()
+            self.cap = None
+
         video_path = self.df.at[index, self.video_col]
         self.cap = cv2.VideoCapture(video_path)
         if not self.cap.isOpened():
@@ -169,6 +172,7 @@ class VideoPointsWidget(QWidget):
             if points_json and isinstance(points_json, str):
                 try:
                     coords = json.loads(points_json)
+                    # coords expected to be list of (x,y) in full-resolution coords
                     points_list = [QPoint(int(x), int(y)) for x, y in coords]
                 except Exception as e:
                     print(f"Failed to load points for video index {index}: {e}")
@@ -179,10 +183,26 @@ class VideoPointsWidget(QWidget):
 
         self.points = self.points_per_video.get(index, [])
 
+        # Compute display scaling: max 80% of screen height
+        screen = QGuiApplication.primaryScreen()
+        screen_height = screen.availableGeometry().height() if screen is not None else 1080
+        max_display_h = int(screen_height * 0.8)
+
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.video_label.setFixedSize(width, height)
 
+        if height > max_display_h:
+            self.display_scale = max_display_h / height
+        else:
+            self.display_scale = 1.0
+
+        w_display = int(round(width * self.display_scale))
+        h_display = int(round(height * self.display_scale))
+
+        # Set fixed size of label to displayed size
+        self.video_label.setFixedSize(w_display, h_display)
+
+        # Start timer (30 fps approx)
         self.timer.start(int(1000 / 30))
 
         self.update_legend_positions()
@@ -213,14 +233,22 @@ class VideoPointsWidget(QWidget):
 
         pixmap = QPixmap.fromImage(qt_img)
 
+        # Scale pixmap to display size (keep aspect ratio)
+        w_display = self.video_label.width()
+        h_display = self.video_label.height()
+        pixmap = pixmap.scaled(w_display, h_display, Qt.AspectRatioMode.KeepAspectRatio)
+
         painter = QPainter(pixmap)
         for idx, pt in enumerate(self.points):
+            # pt holds full-resolution coords; convert to display coords
+            dx = int(round(pt.x() * self.display_scale))
+            dy = int(round(pt.y() * self.display_scale))
             color = self.corner_colors[idx] if idx < len(self.corner_colors) else QColor('red')
             pen = QPen(color, 8)
             painter.setPen(pen)
-            painter.drawPoint(pt)
+            painter.drawPoint(dx, dy)
 
-        # Draw video index and filename top-left corner
+        # Draw video index and filename top-left corner (display coords)
         painter.setPen(QColor('white'))
         font = QFont()
         font.setPointSize(16)
@@ -237,22 +265,27 @@ class VideoPointsWidget(QWidget):
         self.update_legend_positions()
 
     def update_legend_positions(self):
-        # Update the position labels next to legend entries
+        # Update the position labels next to legend entries (show full-resolution coords)
         for idx in range(len(self.corner_names)):
             if idx < len(self.points):
-                pt = self.points[idx]
+                pt = self.points[idx]  # full-res
                 self.legend_pos_labels[idx].setText(f"(x={pt.x()}, y={pt.y()})")
             else:
                 self.legend_pos_labels[idx].setText("(x=_, y=_)")
 
     def on_click(self, ev):
+        # ev.pos() is in display coordinates; convert to full-resolution coords
         if len(self.points) >= 4:
             return
-        pos = ev.pos()
-        if 0 <= pos.x() < self.video_label.width() and 0 <= pos.y() < self.video_label.height():
-            self.points.append(pos)
-            self.update_frame()
 
+        pos = ev.pos()
+        # bounds check against displayed label size
+        if 0 <= pos.x() < self.video_label.width() and 0 <= pos.y() < self.video_label.height():
+            # convert to full-resolution coords before storing
+            orig_x = int(round(pos.x() / self.display_scale))
+            orig_y = int(round(pos.y() / self.display_scale))
+            self.points.append(QPoint(orig_x, orig_y))
+            self.update_frame()
 
     def prev_video(self):
         new_index = (self.current_index - 1) % len(self.df)

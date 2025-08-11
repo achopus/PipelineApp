@@ -3,17 +3,27 @@ import pandas as pd
 from pathlib import Path
 
 from shutil import copy # TODO Change this with networking
+from cluster_networking.ssh_handling import slurm_text_preprocessing, ssh_send_command
+
 from typing import Callable
+
 
 def preprocessing_function_dummy(files_to_process: list[str], keypoints: list[tuple[float, float]], target_folder: str):
     for file in files_to_process:
         copy(file, os.path.join(target_folder, Path(file).name))
 
-# TODO Create ssh connect to cluster with slurm instructions
-def preprocessing_function(files_to_process: list[str], keypoints: list[tuple[float, float]], target_folder: str):
-    pass
 
-def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable = preprocessing_function_dummy) -> bool:
+def preprocessing_function(project_folder: str, files_to_process: list[str], keypoints: list[str], target_folder: str):
+    commands = slurm_text_preprocessing(project_folder, files_to_process, keypoints, target_folder)
+    ssh_send_command(commands)
+
+def convert_to_linux_path(windows_path: str) -> str:
+    linux_path = windows_path.replace("\\", "/")
+    linux_path = "/proj/BV_data/" + linux_path[linux_path.find("TrackingPRC"):]
+    return linux_path
+
+
+def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable = preprocessing_function) -> bool:
     project_folder = os.path.dirname(dataframe_path)
     preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
     completed_files = [Path(file).name for file in os.listdir(preprocessed_folder)]
@@ -28,5 +38,9 @@ def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable 
     files_to_process = [f for f, m in zip(files_to_process, mask_done) if not m]
     points = [p for p, m in zip(points, mask_done) if not m]
     
-    preprocessing_function(files_to_process, points, preprocessed_folder)
+    project_folder = convert_to_linux_path(project_folder)
+    preprocessed_folder = convert_to_linux_path(preprocessed_folder)
+    files_to_process = list(map(convert_to_linux_path, files_to_process))
+    
+    preprocessing_function(project_folder, files_to_process, points, preprocessed_folder)
     return True

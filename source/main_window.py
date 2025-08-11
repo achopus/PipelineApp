@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
 
         self.tabs.addTab(self.project_tab, "1. Project Management")
         self.tabs.addTab(self.video_points_tab, "2. Video Points Annotation")
-        self.tabs.addTab(self.tracking_tab, "3. Animal tracking")
+        self.tabs.addTab(self.tracking_tab, "3. Animal tracking + Results")
 
         self.tabs.setTabEnabled(2, False)  # Disable tab 3 initially
         self.tabs.setTabEnabled(1, False)  # Disable tab 2 initially
@@ -54,16 +54,16 @@ class MainWindow(QMainWindow):
 
         # Buttons
         button_layout = QHBoxLayout()
-        btn_create_project = QPushButton("Create project...")
-        btn_create_project.setFixedSize(200, 30)
-        btn_create_project.clicked.connect(self.create_project)
+        self.btn_create_project = QPushButton("Create project...")
+        self.btn_create_project.setFixedSize(200, 30)
+        self.btn_create_project.clicked.connect(self.create_project)
 
-        btn_load_yaml = QPushButton("Load existing project...")
-        btn_load_yaml.setFixedSize(200, 30)
-        btn_load_yaml.clicked.connect(self.load_yaml_file)
+        self.btn_load_yaml = QPushButton("Load existing project...")
+        self.btn_load_yaml.setFixedSize(200, 30)
+        self.btn_load_yaml.clicked.connect(self.load_yaml_file)
 
-        button_layout.addWidget(btn_create_project)
-        button_layout.addWidget(btn_load_yaml)
+        button_layout.addWidget(self.btn_create_project)
+        button_layout.addWidget(self.btn_load_yaml)
         button_layout.addStretch()
         left_layout.addLayout(button_layout)
 
@@ -142,6 +142,12 @@ class MainWindow(QMainWindow):
         self.load_progress_table()
         self.number_of_videos.setText(str(self.dataframe.shape[0] if type(self.dataframe) == pd.DataFrame else 0))
 
+        self.btn_load_yaml.setVisible(False)
+        self.btn_create_project.setVisible(False)
+        
+        self.tabs.setTabEnabled(2, True)
+        self.tabs.setTabEnabled(1, True)
+
         self.enable_video_points_tab()
 
     def create_project(self):
@@ -157,7 +163,12 @@ class MainWindow(QMainWindow):
             self.number_of_videos.setText(str(self.dataframe.shape[0] if type(self.dataframe) == pd.DataFrame else 0))
             print(f"New Project: {dialog.project_name.text()}, Author: {dialog.author_name.text()}, Folder: {dialog.folder_field.text()}")
 
+
+            self.tabs.setTabEnabled(2, True)
+            self.tabs.setTabEnabled(1, True)
             self.enable_video_points_tab()
+            self.btn_load_yaml.setVisible(False)
+            self.btn_create_project.setVisible(False)
 
     def load_progress_table(self):
         if self.dataframe_path and os.path.exists(self.dataframe_path):
@@ -209,7 +220,7 @@ class MainWindow(QMainWindow):
         if not self.dataframe_path or not os.path.exists(self.dataframe_path):
             return
 
-        df = pd.read_csv(self.dataframe_path)
+        df = self.dataframe
 
         # Layout & buttons for tab 2
         layout = QVBoxLayout()
@@ -244,7 +255,7 @@ class MainWindow(QMainWindow):
 
         def open_video_annotation():
             if self.video_widget is None:
-                self.video_widget = VideoPointsWidget(df, "videos")
+                self.video_widget = VideoPointsWidget(self.dataframe, "videos") # pyright: ignore[reportArgumentType]
                 self.video_widget.data_changed.connect(self.on_video_points_data_changed)
                 v_layout = QVBoxLayout()
                 v_layout.setContentsMargins(0, 0, 0, 0)
@@ -271,69 +282,72 @@ class MainWindow(QMainWindow):
                     "No preprocessing could have been done. Please annotate your data first!"
                 )
             
-        def check_preprocessing_status():
-            assert self.dataframe_path and isinstance(self.dataframe, pd.DataFrame)
-            project_folder = os.path.dirname(self.dataframe_path)
-            preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
-
-            if not os.path.exists(preprocessed_folder):
-                QMessageBox.warning(self, "Warning", f"Preprocessed folder not found:\n{preprocessed_folder}")
-                return
-
-            completed_files = {Path(f).name for f in os.listdir(preprocessed_folder)}
-
-            files_to_process = self.dataframe.loc[self.dataframe['Status'] == 'Preprocessing ready', 'videos'].to_list()
-
-            done_mask = []
-            now = time.time()
-            min_size_bytes = 5 * 1024 * 1024  # 5 MB
-            min_mod_seconds = 5  # 5 seconds
-
-            for file_path in files_to_process:
-                fname = Path(file_path).name
-                preprocessed_path = os.path.join(preprocessed_folder, fname)
-
-                if fname in completed_files:
-                    try:
-                        stat = os.stat(preprocessed_path)
-                        size_ok = stat.st_size > min_size_bytes
-                        time_ok = (now - stat.st_mtime) > min_mod_seconds
-                        done_mask.append(size_ok and time_ok)
-                    except Exception:
-                        done_mask.append(False)
-                else:
-                    done_mask.append(False)
-
-            # Update dataframe status for done files
-            idxs = self.dataframe[self.dataframe['Status'] == 'Preprocessing ready'].index
-            done_indices = idxs[[i for i, done in enumerate(done_mask) if done]]
-
-            self.dataframe.loc[done_indices, 'Status'] = 'Tracking ready'
-
-            # Show popup summary
-            done_count = self.dataframe[self.dataframe['Status'] == 'Tracking ready'].shape[0]
-            total = self.dataframe.shape[0]
-            not_ready = total - done_count
-
-            QMessageBox.information(
-                self,
-                "Preprocessing Status",
-                f"{done_count} files are ready for tracking.\n{not_ready} files are still not ready."
-            )
-
-            # Optionally refresh your UI table here
-            self.update_progress_table()
-            # Save dataframe changes if needed
-            if self.dataframe_path:
-                self.dataframe.to_csv(self.dataframe_path, index=False)
             
-            
-            
-
         btn_open_video.clicked.connect(open_video_annotation)
         btn_cluster.clicked.connect(preprocessing_wrapper)
-        btn_check_status.clicked.connect(check_preprocessing_status)
-    
+        btn_check_status.clicked.connect(self.check_preprocessing_status)
+        
+    def enable_trackres_tab(self):
+        if not self.dataframe_path or not os.path.exists(self.dataframe_path):
+            return
+
+    def check_preprocessing_status(self):
+        assert self.dataframe_path and isinstance(self.dataframe, pd.DataFrame)
+        project_folder = os.path.dirname(self.dataframe_path)
+        preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
+
+        if not os.path.exists(preprocessed_folder):
+            QMessageBox.warning(self, "Warning", f"Preprocessed folder not found:\n{preprocessed_folder}")
+            return
+
+        completed_files = {Path(f).name for f in os.listdir(preprocessed_folder)}
+
+        files_to_process = self.dataframe.loc[self.dataframe['Status'] == 'Preprocessing ready', 'videos'].to_list()
+
+        done_mask = []
+        now = time.time()
+        min_size_bytes = 5 * 1024 * 1024  # 5 MB
+        min_mod_seconds = 30  # 30 seconds
+
+        for file_path in files_to_process:
+            fname = Path(file_path).name
+            preprocessed_path = os.path.join(preprocessed_folder, fname)
+
+            if fname in completed_files:
+                try:
+                    stat = os.stat(preprocessed_path)
+                    size_ok = stat.st_size > min_size_bytes
+                    time_ok = (now - stat.st_mtime) > min_mod_seconds
+                    done_mask.append(size_ok and time_ok)
+                except Exception:
+                    done_mask.append(False)
+            else:
+                done_mask.append(False)
+
+        # Update dataframe status for done files
+        idxs = self.dataframe[self.dataframe['Status'] == 'Preprocessing ready'].index
+        done_indices = idxs[[i for i, done in enumerate(done_mask) if done]]
+
+        self.dataframe.loc[done_indices, 'Status'] = 'Tracking ready'
+
+        # Show popup summary
+        done_count = self.dataframe[self.dataframe['Status'] == 'Tracking ready'].shape[0]
+        total = self.dataframe.shape[0]
+        not_ready = total - done_count
+
+        QMessageBox.information(
+            self,
+            "Preprocessing Status",
+            f"{done_count} files are ready for tracking.\n{not_ready} files are still not ready."
+        )
+
+        # Optionally refresh your UI table here
+        self.update_progress_table()
+        # Save dataframe changes if needed
+        if self.dataframe_path:
+            self.dataframe.to_csv(self.dataframe_path, index=False)
+
+
     def on_video_points_data_changed(self, updated_df: pd.DataFrame):
         self.dataframe = updated_df.copy()
         self.update_progress_table()
