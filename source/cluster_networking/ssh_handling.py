@@ -7,10 +7,6 @@ def ssh_send_command(commands: list[str]):
     """
     Connect to remote host via SSH and send commands without waiting for each to finish.
     """
-    from dotenv import load_dotenv
-    import os
-    import paramiko
-
     load_dotenv()
     host = os.getenv("SSH_HOST", "sup200.ad.nudz.cz")
     port = int(os.getenv("SSH_PORT", "22"))
@@ -89,14 +85,3 @@ def slurm_text_tracking(project_folder: str, videos: list[str], target_folder: s
         
     slurm_texts = [generate_text(v) for v in videos]
     return slurm_texts
-
-
-if __name__ == "__main__":
-    project_folder = "test_project"
-    videos = ["video1.mp4", "video2.mp4"]
-    points = ["[[1, 2], [3, 4], [5, 6], [7, 8]]", "[[1, 2], [3, 4], [5, 6], [7, 8]]"]
-    target_folder = "test_target"
-    
-    commands = slurm_text_preprocessing(project_folder, videos, points, target_folder)
-    
-    ssh_send_command(commands)

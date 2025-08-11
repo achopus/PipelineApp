@@ -2,26 +2,13 @@ import os
 import pandas as pd
 from pathlib import Path
 
-from shutil import copy # TODO Change this with networking
 from cluster_networking.ssh_handling import slurm_text_preprocessing, ssh_send_command
-
+from utils import convert_to_linux_path
 from typing import Callable
-
-
-def preprocessing_function_dummy(files_to_process: list[str], keypoints: list[tuple[float, float]], target_folder: str):
-    for file in files_to_process:
-        copy(file, os.path.join(target_folder, Path(file).name))
-
 
 def preprocessing_function(project_folder: str, files_to_process: list[str], keypoints: list[str], target_folder: str):
     commands = slurm_text_preprocessing(project_folder, files_to_process, keypoints, target_folder)
     ssh_send_command(commands)
-
-def convert_to_linux_path(windows_path: str) -> str:
-    linux_path = windows_path.replace("\\", "/")
-    linux_path = "/proj/BV_data/" + linux_path[linux_path.find("TrackingPRC"):]
-    return linux_path
-
 
 def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable = preprocessing_function) -> bool:
     project_folder = os.path.dirname(dataframe_path)

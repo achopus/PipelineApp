@@ -17,6 +17,7 @@ from gui.style import DARK_STYLE, STATUS_COLORS
 
 from gui.video_points_widget import VideoPointsWidget
 from cluster_networking.preprocessing import cluster_preprocessing
+from cluster_networking.tracking import cluster_tracking
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -290,6 +291,23 @@ class MainWindow(QMainWindow):
     def enable_trackres_tab(self):
         if not self.dataframe_path or not os.path.exists(self.dataframe_path):
             return
+        layout = QVBoxLayout()
+        btn_layout = QHBoxLayout()
+
+        btn_run_tracking = QPushButton("Run Tracking on Cluster")
+        btn_run_tracking.setFixedSize(350, 30)
+
+        btn_layout.addWidget(btn_run_tracking)
+        btn_layout.addStretch()
+
+        layout.addLayout(btn_layout)
+
+        self.tracking_tab.setLayout(layout)
+
+        def run_tracking():
+            cluster_tracking(self.dataframe_path) #type: ignore
+
+        btn_run_tracking.clicked.connect(run_tracking)
 
     def check_preprocessing_status(self):
         assert self.dataframe_path and isinstance(self.dataframe, pd.DataFrame)
