@@ -7,7 +7,7 @@ from cluster_networking.utils import convert_to_linux_path
 from typing import Callable
 
 def tracking_function(project_folder: str, files_to_process: list[str], target_folder: str):
-    commands = slurm_text_tracking(project_folder, files_to_process, target_folder)
+    commands = slurm_text_tracking(files_to_process, target_folder)
     ssh_send_command(commands)
 
 def cluster_tracking(dataframe_path: str, preprocessing_function: Callable = tracking_function) -> bool:
@@ -24,6 +24,7 @@ def cluster_tracking(dataframe_path: str, preprocessing_function: Callable = tra
     project_folder = convert_to_linux_path(project_folder)
     tracking_folder = convert_to_linux_path(tracking_folder)
     files_to_process = list(map(convert_to_linux_path, files_to_process))
-    
+    files_to_process = [f.replace("/videos/", "/videos_preprocessed/") for f in files_to_process]
+
     preprocessing_function(project_folder, files_to_process, tracking_folder)
     return True

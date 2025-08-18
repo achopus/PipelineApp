@@ -35,7 +35,7 @@ def ssh_send_command(commands: list[str]):
         client.close()
 
 
-def slurm_text_preprocessing(project_folder: str, videos: list[str], keypoints: list[str], target_folder: str) -> list[str]:
+def slurm_text_preprocessing(videos: list[str], keypoints: list[str], target_folder: str) -> list[str]:
     def generate_text(video_file: str, corners: str) -> str:
         return f"""
         #!/bin/bash
@@ -44,7 +44,7 @@ def slurm_text_preprocessing(project_folder: str, videos: list[str], keypoints: 
         #SBATCH --cpus-per-task=1
         #SBATCH --mem=8gb
         #SBATCH --time=1-00:00:00
-        #SBATCH --output=logs/preprocessing_%j.log
+        #SBATCH --output=/home/vojtech.brejtr/pipelines/app_preprocessing/logs_preprocessing/preprocessing_%j.log
 
         module load Miniforge3/24.9.0-0
         source /cvmfs/sys.sw.nudz/software/Miniforge3/24.9.0-0/bin/activate
@@ -60,17 +60,17 @@ def slurm_text_preprocessing(project_folder: str, videos: list[str], keypoints: 
     slurm_texts = [generate_text(v, k) for v, k in zip(videos, keypoints)]
     return slurm_texts
 
-def slurm_text_tracking(project_folder: str, videos: list[str], target_folder: str) -> list[str]:
+def slurm_text_tracking(videos: list[str], target_folder: str) -> list[str]:
     def generate_text(video_file: str):
         return f"""
         #!/bin/bash
         #SBATCH --job-name=PRC_BehaviorPipeline_Tracking_{Path(video_file).name}
         #SBATCH --ntasks=1
-        #SBATCH --cpus-per-task=1
+        #SBATCH --cpus-per-task=4
         #SBATCH --partition=PipelineProdGPU
         #SBATCH --mem=16gb
         #SBATCH --time=1-00:00:00
-        #SBATCH --output=logs/tracking_%j.log
+        #SBATCH --output=/home/vojtech.brejtr/pipelines/app_preprocessing/logs_tracking/tracking_%j.log
         
         module load Miniforge3/24.9.0-0
         source /cvmfs/sys.sw.nudz/software/Miniforge3/24.9.0-0/bin/activate
@@ -80,7 +80,7 @@ def slurm_text_tracking(project_folder: str, videos: list[str], target_folder: s
 
         cd /home/vojtech.brejtr/pipelines/app_preprocessing/
 
-        python extract_pose.py --video_path {video_file} --out_folder {target_folder}
+        python extract_pose.py --video_path {video_file} --out_folder {target_folder} > /dev/null 2>&1
         """
         
     slurm_texts = [generate_text(v) for v in videos]

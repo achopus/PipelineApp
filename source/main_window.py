@@ -1,6 +1,5 @@
 import sys
 import os
-from cv2 import QT_FONT_BLACK
 import yaml
 from pathlib import Path
 import time
@@ -19,6 +18,12 @@ from gui.video_points_widget import VideoPointsWidget
 from cluster_networking.preprocessing import cluster_preprocessing
 from cluster_networking.tracking import cluster_tracking
 
+from file_management.active_file_check import check_folders
+from file_management.status import Status
+
+from typing import Dict
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -26,6 +31,9 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.setTabPosition(QTabWidget.North)
+        
+        self.folder_path: str | None = None
+        self.status: Dict[str, Status] | None = None
 
         self.project_tab = self.create_project_management_tab()
         self.video_points_tab = QWidget()  # empty container for tab 2 content
@@ -125,6 +133,9 @@ class MainWindow(QMainWindow):
         tab.setLayout(main_layout)
         return tab
 
+    def on_tab_changed(self):
+        self.update_progress_table()
+
     def load_yaml_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open YAML File", "", "YAML Files (*.yaml *.yml)")
         if not file_path:
@@ -132,6 +143,7 @@ class MainWindow(QMainWindow):
 
         with open(file_path, "r") as f:
             data = yaml.safe_load(f)
+        self.folder_path =  os.path.dirname(file_path)
 
         self.project_name.setText(str(data.get("project_name", "")))
         self.author_name.setText(str(data.get("author", "")))
@@ -140,8 +152,7 @@ class MainWindow(QMainWindow):
         timestamp_formated = datetime.fromisoformat(timestamp_str).strftime("%d.%m.%Y %H:%M")
         self.creation_time.setText(timestamp_formated)
         self.dataframe_path = str(data.get("dataframe", ""))
-        self.load_progress_table()
-        self.number_of_videos.setText(str(self.dataframe.shape[0] if type(self.dataframe) == pd.DataFrame else 0))
+        self.update_progress_table()
 
         self.btn_load_yaml.setVisible(False)
         self.btn_create_project.setVisible(False)
@@ -156,13 +167,12 @@ class MainWindow(QMainWindow):
         dialog = CreateProjectDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             self.yaml_path, self.dataframe_path = create_project_folder(dialog)
-            self.load_progress_table()
+            self.update_progress_table()
             self.project_name.setText(dialog.project_name.text())
             self.author_name.setText(dialog.author_name.text())
             self.experiment_type.setText(dialog.dropdown.currentText())
             timestamp_str = datetime.now().strftime("%d.%m.%Y %H:%M")
             self.creation_time.setText(timestamp_str)
-            self.number_of_videos.setText(str(self.dataframe.shape[0] if type(self.dataframe) == pd.DataFrame else 0))
             print(f"New Project: {dialog.project_name.text()}, Author: {dialog.author_name.text()}, Folder: {dialog.folder_field.text()}")
 
 
@@ -173,27 +183,22 @@ class MainWindow(QMainWindow):
             self.btn_load_yaml.setVisible(False)
             self.btn_create_project.setVisible(False)
 
-    def load_progress_table(self):
-        if self.dataframe_path and os.path.exists(self.dataframe_path):
-            df = pd.read_csv(self.dataframe_path)
-            self.dataframe = df.copy()
-        else:
-            df = pd.DataFrame(columns=["Filename", "Status"])
-
-        self.table.setRowCount(len(df))
-        for row in range(len(df)):
-            self.table.setItem(row, 0, QTableWidgetItem(Path(str(df.iloc[row, 0])).stem))
-            self.table.setItem(row, 1, QTableWidgetItem(str(df.iloc[row, 1])))
-        self.color_status_rows()
-            
     def update_progress_table(self):
-        if type(self.dataframe) != pd.DataFrame: return
-        df = self.dataframe.copy()
-        self.table.setRowCount(len(df))
-        for row in range(len(df)):
-            self.table.setItem(row, 0, QTableWidgetItem(Path(str(df.iloc[row, 0])).stem))
-            self.table.setItem(row, 1, QTableWidgetItem(str(df.iloc[row, 1])))
+        source_folder = os.path.join(str(self.folder_path), "videos")
+        preprocessin_folder = os.path.join(str(self.folder_path), "videos_preprocessed")
+        tracking_folder = os.path.join(str(self.folder_path), "tracking")
+        dataframe_path = self.dataframe_path if self.dataframe_path is not None else ""
+        self.status = check_folders(source_folder, preprocessin_folder, tracking_folder, dataframe_path)
+        self.number_of_videos.setText(str(len(self.status)))
+        self.table.setRowCount(len(self.status))
+        for row, (k, v) in enumerate(self.status.items()):
+            self.table.setItem(row, 0, QTableWidgetItem(Path(k).stem))
+            self.table.setItem(row, 1, QTableWidgetItem(v.name))
         self.color_status_rows()
+        #pd.DataFrame(self.status).to_csv(os.path.join(str(self.folder_path), "project_dataframe.csv"), index=False)
+            
+        
+        
 
     def color_status_rows(self):
         """Apply background colors to rows in table based on exact status matches."""
@@ -222,8 +227,6 @@ class MainWindow(QMainWindow):
     def enable_video_points_tab(self):
         if not self.dataframe_path or not os.path.exists(self.dataframe_path):
             return
-
-        df = self.dataframe
 
         # Layout & buttons for tab 2
         layout = QVBoxLayout()
@@ -322,7 +325,7 @@ class MainWindow(QMainWindow):
 
         completed_files = {Path(f).name for f in os.listdir(preprocessed_folder)}
 
-        files_to_process = self.dataframe.loc[self.dataframe['Status'] == 'Preprocessing ready', 'videos'].to_list()
+        files_to_process = self.dataframe.loc[self.dataframe['Status'] == Status.READY_PREPROCESS.name, 'videos'].to_list()
 
         done_mask = []
         now = time.time()
@@ -345,13 +348,13 @@ class MainWindow(QMainWindow):
                 done_mask.append(False)
 
         # Update dataframe status for done files
-        idxs = self.dataframe[self.dataframe['Status'] == 'Preprocessing ready'].index
+        idxs = self.dataframe[self.dataframe['Status'] == Status.READY_PREPROCESS.name].index
         done_indices = idxs[[i for i, done in enumerate(done_mask) if done]]
 
-        self.dataframe.loc[done_indices, 'Status'] = 'Tracking ready'
+        self.dataframe.loc[done_indices, 'Status'] = Status.READY_TRACKING.name
 
         # Show popup summary
-        done_count = self.dataframe[self.dataframe['Status'] == 'Tracking ready'].shape[0]
+        done_count = self.dataframe[self.dataframe['Status'] == Status.READY_TRACKING.name].shape[0]
         total = self.dataframe.shape[0]
         not_ready = total - done_count
 
