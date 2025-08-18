@@ -2,7 +2,6 @@ import os
 from datetime import datetime
 
 import yaml
-import pandas as pd
 
 from tqdm import tqdm
 from shutil import copy as shutil_copy
@@ -103,7 +102,7 @@ class CreateProjectDialog(QDialog):
         else:
             field.setStyleSheet("border: 1px solid red;")
             
-def create_project_folder(dialog: CreateProjectDialog) -> Tuple[str, str]:
+def create_project_folder(dialog: CreateProjectDialog) -> str:
     PROJECT_FOLDER = "//srv-fs.ad.nudz.cz/BV_data/TrackingPRC"
     if not os.path.exists(PROJECT_FOLDER):
         os.mkdir(PROJECT_FOLDER)
@@ -116,7 +115,7 @@ def create_project_folder(dialog: CreateProjectDialog) -> Tuple[str, str]:
     os.mkdir(os.path.join(PROJECT_FOLDER, folder_name))
     
     # Subfolder creation
-    for subfolder in ['videos', 'videos_preprocessed', 'tracking', 'results', 'images']:
+    for subfolder in ['videos', 'points', 'videos_preprocessed', 'tracking', 'results', 'images']:
         os.mkdir(os.path.join(PROJECT_FOLDER, folder_name, subfolder))
         
     # Video copy to project folder
@@ -124,22 +123,12 @@ def create_project_folder(dialog: CreateProjectDialog) -> Tuple[str, str]:
     for video in tqdm(source_video_files, desc='Copying video files to project folder'):
         shutil_copy(os.path.join(dialog.folder_field.text(), video), os.path.join(PROJECT_FOLDER, folder_name, 'videos', video))
     
-    # Create a tracking csv
-    df = pd.DataFrame(
-        data = {
-            "videos": [os.path.join(PROJECT_FOLDER, folder_name, 'videos', video) for video in source_video_files],
-            "Status": ['Loaded'] * len(source_video_files)
-        }
-    )
-    project_df_path = os.path.join(PROJECT_FOLDER, folder_name, "project_dataframe.csv")
-    df.to_csv(project_df_path, index=False)
     
     yaml_dict = {
         "project_name": project_name,
         "creation_time": creation_time,
         "author": dialog.author_name.text(),
         "experiment_type": dialog.dropdown.currentText(),
-        "dataframe": project_df_path
     }
     
     yaml_path = os.path.join(PROJECT_FOLDER, folder_name, "config.yaml")
@@ -148,4 +137,4 @@ def create_project_folder(dialog: CreateProjectDialog) -> Tuple[str, str]:
         yaml.dump(yaml_dict, f, default_flow_style=False, allow_unicode=True)
     
     
-    return yaml_path, project_df_path
+    return yaml_path

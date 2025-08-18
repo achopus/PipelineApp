@@ -1,5 +1,5 @@
 import os
-import pandas as pd
+
 from pathlib import Path
 
 from cluster_networking.ssh_handling import slurm_text_preprocessing, ssh_send_command
@@ -10,18 +10,14 @@ def preprocessing_function(files_to_process: list[str], keypoints: list[str], ta
     commands = slurm_text_preprocessing(files_to_process, keypoints, target_folder)
     ssh_send_command(commands)
 
-def cluster_preprocessing(dataframe_path: str, preprocessing_function: Callable = preprocessing_function) -> bool:
-    project_folder = os.path.dirname(dataframe_path)
+def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = preprocessing_function) -> bool:
+    project_folder = os.path.dirname(yaml_path)
     preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
     completed_files = [Path(file).name for file in os.listdir(preprocessed_folder)]
     
-    df = pd.read_csv(dataframe_path)
-    if 'keypoint_positions' not in df.columns:
-        return False
-    
-    files_to_process = df.loc[df['Status'] == 'Preprocessing ready', 'videos'].to_list()
+    files_to_process = [os.path.join(project_folder, "videos", file) for file in os.listdir(os.path.join(project_folder, "videos")) if file.endswith(('.mp4', '.avi'))]
     mask_done = [Path(file).name in completed_files for file in files_to_process]
-    points = df.loc[df['Status'] == 'Preprocessing ready', 'keypoint_positions'].to_list()
+    points = [os.path.join(project_folder, "points", Path(file).stem + ".npy") for file in files_to_process]
     files_to_process = [f for f, m in zip(files_to_process, mask_done) if not m]
     points = [p for p, m in zip(points, mask_done) if not m]
     

@@ -1,15 +1,13 @@
 import os
-import pandas as pd
-from pathlib import Path
 import time
-
-from pandas import DataFrame
-from typing import Dict
-
+from pathlib import Path
 from file_management.status import Status
 
+from typing import Dict
 
-def check_preprocessing_status(video_path: str, df: DataFrame) -> Status:
+
+
+def check_preprocessing_status(video_path: str) -> Status:
     if os.path.exists(video_path):
         min_size_bytes = 5 * 1024 * 1024  # 5 MB
         min_mod_seconds = 30  # 30 seconds
@@ -22,31 +20,26 @@ def check_preprocessing_status(video_path: str, df: DataFrame) -> Status:
         else:
             return Status.PREPROCESSING_IN_PROGRESS
 
-    
-    points = df[df['videos'] == video_path, 'keypoint_locations']
-    if type(points) == str:
-        return Status.READY_PREPROCESS
-    else:
-        return Status.LOADED
+    is_annotated = os.path.exists(os.path.join(Path(video_path).parent, 'points', Path(video_path).name.replace('.mp4', '.npy')))
 
+    return Status.READY_PREPROCESS if is_annotated else Status.LOADED
 
 def extract_tracking_name(tracking_path: str) -> str:
     return tracking_path.split("DLC")[0] + ".mp4"
 
 
-def check_folders(source_folder: str, preprocessing_folder: str, tracking_folder: str, dataframe_path: str) -> Dict[str, Status]:
-    df = pd.read_csv(dataframe_path)
+def check_folders(source_folder: str, preprocessing_folder: str, tracking_folder: str, point_folder: str) -> Dict[str, Status]:
     videos_source = os.listdir(source_folder)
     videos_prepro = os.listdir(preprocessing_folder)
     tracking = [f for f in os.listdir(tracking_folder) if f.endswith(".csv")]
 
     status = {video: Status.LOADED for video in videos_source}
     
-    
+    points = [Path(point).name for point in os.listdir(point_folder)]
     if len(videos_source):
         for video in videos_source:
-            points = df.loc[df['videos'] == video, 'keypoint_positions']
-            if type(points) == str:
+            assert video in status.keys()
+            if Path(video).name in points:
                 status[video] = Status.READY_PREPROCESS
     else:
         return status    

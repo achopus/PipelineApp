@@ -1,7 +1,6 @@
-import sys
+import os
 from pathlib import Path
 import numpy as np
-import pandas as pd
 import json
 import cv2
 from PyQt5.QtWidgets import (
@@ -10,14 +9,13 @@ from PyQt5.QtWidgets import (
     QApplication
 )
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor, QGuiApplication
-from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, QPoint
 
 class VideoPointsWidget(QWidget):
-    data_changed = pyqtSignal(pd.DataFrame)
-    def __init__(self, df: pd.DataFrame, video_col: str):
+    def __init__(self, video_folder: str):
         super().__init__()
-        self.df = df.reset_index(drop=True)
-        self.video_col = video_col
+        self.video_folder = video_folder
+        self.videos = os.listdir(video_folder)
         self.current_index = 0
         self.points_per_video = {}  # Dict[int, List[QPoint]]  (stored as full-resolution coords)
         self.points = []  # Current video points (full-res coords)
@@ -124,12 +122,12 @@ class VideoPointsWidget(QWidget):
         self.setFocus()
 
     def populate_video_list(self):
-        self.video_list.clear()
-        for i, row in self.df.iterrows():
-            filename = row[self.video_col]
-            status = row.get("Status", "")
+        points = [Path(p).name for p in os.listdir(os.path.join(Path(self.video_folder).parent, 'points'))]
+        for i, video in self.videos:
+            filename = Path(video).name
+            annotated = filename in points
             item = QListWidgetItem(f"{i+1}. {Path(filename).stem}") # type: ignore
-            if status == "Preprocessing ready":
+            if annotated:
                 item.setForeground(QColor("white"))
                 item.setBackground(QColor("green"))
             else:
@@ -143,7 +141,7 @@ class VideoPointsWidget(QWidget):
         try:
             idx_str = text.split(".", 1)[0]
             idx = int(idx_str) - 1
-            if 0 <= idx < len(self.df):
+            if 0 <= idx < len(self.videos):
                 self.load_video(idx)
         except Exception:
             pass
@@ -159,25 +157,23 @@ class VideoPointsWidget(QWidget):
             self.cap.release()
             self.cap = None
 
-        video_path = self.df.at[index, self.video_col]
+        video_path = self.videos[index]
         self.cap = cv2.VideoCapture(video_path)
         if not self.cap.isOpened():
             QMessageBox.critical(self, "Error", f"Cannot open video:\n{video_path}")
             return
 
-        # === Load saved points from dataframe if any ===
         points_list = []
-        if "keypoint_positions" in self.df.columns:
-            points_json = self.df.at[index, "keypoint_positions"]
-            if points_json and isinstance(points_json, str):
-                try:
-                    coords = json.loads(points_json)
-                    # coords expected to be list of (x,y) in full-resolution coords
-                    points_list = [QPoint(int(x), int(y)) for x, y in coords]
-                except Exception as e:
-                    print(f"Failed to load points for video index {index}: {e}")
+        points_path = os.path.join(Path(video_path).parent, 'points', Path(video_path).name.replace('.mp4', '.npy'))
+        if os.path.exists(points_path):
+            points_npy = np.load(points_path)
+            try:
+                coords = np.load(points_npy)
+                # coords expected to be list of (x,y) in full-resolution coords
+                points_list = [QPoint(int(x), int(y)) for x, y in coords] # TODO Match this to implementation
+            except Exception as e:
+                print(f"Failed to load points for video index {index}: {e}")
 
-        # Restore points from cache or from dataframe
         if index not in self.points_per_video:
             self.points_per_video[index] = points_list
 
@@ -255,7 +251,7 @@ class VideoPointsWidget(QWidget):
         font.setBold(True)
         painter.setFont(font)
 
-        text = f"{self.current_index + 1} / {len(self.df)} : {Path(self.df.at[self.current_index, self.video_col]).stem}"
+        text = f"{self.current_index + 1} / {len(self.videos)} : {Path(self.videos[self.current_index]).stem}"
         painter.drawText(10, 30, text)
 
         painter.end()
@@ -288,12 +284,12 @@ class VideoPointsWidget(QWidget):
             self.update_frame()
 
     def prev_video(self):
-        new_index = (self.current_index - 1) % len(self.df)
+        new_index = (self.current_index - 1) % len(self.videos)
         self.load_video(new_index)
 
 
     def next_video(self):
-        new_index = (self.current_index + 1) % len(self.df)
+        new_index = (self.current_index + 1) % len(self.videos)
         self.load_video(new_index)
 
 
@@ -302,11 +298,6 @@ class VideoPointsWidget(QWidget):
             # Reset current video points
             self.points = []
             self.points_per_video[self.current_index] = []
-
-            # Update DataFrame status back to 'Loaded' for this video index
-            if "keypoint_positions" in self.df.columns:
-                self.df.at[self.current_index, "keypoint_positions"] = ""
-            self.df.at[self.current_index, "Status"] = "Loaded"
 
             self.update_frame()
 
@@ -326,21 +317,10 @@ class VideoPointsWidget(QWidget):
                 return False
 
         self.points_per_video[self.current_index] = self.points
-        if "keypoint_positions" not in self.df.columns:
-            self.df["keypoint_positions"] = ""
 
-        # Build a Series from points_per_video dict: index -> json string
-        s = pd.Series({
-            idx: json.dumps([(p.x(), p.y()) for p in points]) if (points and len(points) == 4) else ''
-            for idx, points in self.points_per_video.items()
-        })
 
-        # Assign the Series to the DataFrame column by matching indices
-        self.df.loc[s.index, "keypoint_positions"] = s
-        self.df.loc[self.df["keypoint_positions"].apply(has_points), "Status"] = "Preprocessing ready"
-        self.df.loc[~self.df["keypoint_positions"].apply(has_points), "Status"] = "Loaded"
+        for video_name, point in self.points_per_video.items():
+            np.save(os.path.join(Path(self.video_folder).parent, 'points', Path(video_name).name.replace('.mp4', '.npy')), np.array([(p.x(), p.y()) for p in point]))
 
         # Refresh video list colors
         self.populate_video_list()
-        
-        self.data_changed.emit(self.df.copy())

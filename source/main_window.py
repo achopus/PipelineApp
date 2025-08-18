@@ -4,7 +4,7 @@ import yaml
 from pathlib import Path
 import time
 from datetime import datetime
-import pandas as pd
+
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QTableWidget,
@@ -50,8 +50,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.showMaximized()
 
-        self.dataframe_path = None
-        self.dataframe = None
         self.video_widget = None
 
     def create_project_management_tab(self) -> QWidget:
@@ -151,7 +149,6 @@ class MainWindow(QMainWindow):
         timestamp_str = str(data.get("creation_time", ""))
         timestamp_formated = datetime.fromisoformat(timestamp_str).strftime("%d.%m.%Y %H:%M")
         self.creation_time.setText(timestamp_formated)
-        self.dataframe_path = str(data.get("dataframe", ""))
         self.update_progress_table()
 
         self.btn_load_yaml.setVisible(False)
@@ -166,7 +163,7 @@ class MainWindow(QMainWindow):
     def create_project(self):
         dialog = CreateProjectDialog(self)
         if dialog.exec_() == QDialog.Accepted:
-            self.yaml_path, self.dataframe_path = create_project_folder(dialog)
+            self.yaml_path = create_project_folder(dialog)
             self.update_progress_table()
             self.project_name.setText(dialog.project_name.text())
             self.author_name.setText(dialog.author_name.text())
@@ -187,18 +184,14 @@ class MainWindow(QMainWindow):
         source_folder = os.path.join(str(self.folder_path), "videos")
         preprocessin_folder = os.path.join(str(self.folder_path), "videos_preprocessed")
         tracking_folder = os.path.join(str(self.folder_path), "tracking")
-        dataframe_path = self.dataframe_path if self.dataframe_path is not None else ""
-        self.status = check_folders(source_folder, preprocessin_folder, tracking_folder, dataframe_path)
+        points_folder = os.path.join(str(self.folder_path), "points")
+        self.status = check_folders(source_folder, preprocessin_folder, tracking_folder, points_folder)
         self.number_of_videos.setText(str(len(self.status)))
         self.table.setRowCount(len(self.status))
         for row, (k, v) in enumerate(self.status.items()):
             self.table.setItem(row, 0, QTableWidgetItem(Path(k).stem))
             self.table.setItem(row, 1, QTableWidgetItem(v.name))
         self.color_status_rows()
-        #pd.DataFrame(self.status).to_csv(os.path.join(str(self.folder_path), "project_dataframe.csv"), index=False)
-            
-        
-        
 
     def color_status_rows(self):
         """Apply background colors to rows in table based on exact status matches."""
@@ -225,9 +218,6 @@ class MainWindow(QMainWindow):
                             cell_item.setBackground(color)
 
     def enable_video_points_tab(self):
-        if not self.dataframe_path or not os.path.exists(self.dataframe_path):
-            return
-
         # Layout & buttons for tab 2
         layout = QVBoxLayout()
         
@@ -261,8 +251,7 @@ class MainWindow(QMainWindow):
 
         def open_video_annotation():
             if self.video_widget is None:
-                self.video_widget = VideoPointsWidget(self.dataframe, "videos") # pyright: ignore[reportArgumentType]
-                self.video_widget.data_changed.connect(self.on_video_points_data_changed)
+                self.video_widget = VideoPointsWidget("videos") # pyright: ignore[reportArgumentType]
                 v_layout = QVBoxLayout()
                 v_layout.setContentsMargins(0, 0, 0, 0)
                 self.video_points_container.setLayout(v_layout)
@@ -273,8 +262,7 @@ class MainWindow(QMainWindow):
                 
         def preprocessing_wrapper():
             #self.video_points_container.setVisible(False)
-            assert self.dataframe_path is not None, "Path to the project dataframe has not been set."
-            succes_flag = cluster_preprocessing(self.dataframe_path)
+            succes_flag = cluster_preprocessing(self.yaml_path)
             if succes_flag:
                 QMessageBox.information(
                     self,
@@ -310,13 +298,12 @@ class MainWindow(QMainWindow):
         self.tabs.setTabEnabled(2, True)  # Ensure tab 3 is enabled
 
         def run_tracking():
-            cluster_tracking(self.dataframe_path)  # type: ignore
+            cluster_tracking(self.yaml_path)  # type: ignore
 
         btn_run_tracking.clicked.connect(run_tracking)
 
     def check_preprocessing_status(self):
-        assert self.dataframe_path and isinstance(self.dataframe, pd.DataFrame)
-        project_folder = os.path.dirname(self.dataframe_path)
+        project_folder = os.path.dirname(self.yaml_path)
         preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
 
         if not os.path.exists(preprocessed_folder):
@@ -325,7 +312,12 @@ class MainWindow(QMainWindow):
 
         completed_files = {Path(f).name for f in os.listdir(preprocessed_folder)}
 
-        files_to_process = self.dataframe.loc[self.dataframe['Status'] == Status.READY_PREPROCESS.name, 'videos'].to_list()
+        files_loaded = os.path.join(project_folder, "videos")
+        files_preprocessed = os.path.join(project_folder, "videos_preprocessed")
+        if len(files_preprocessed):
+            files_to_process = [video_source for video_source in files_loaded if video_source not in files_preprocessed]
+        else:
+            files_to_process = files_loaded
 
         done_mask = []
         now = time.time()
@@ -347,15 +339,9 @@ class MainWindow(QMainWindow):
             else:
                 done_mask.append(False)
 
-        # Update dataframe status for done files
-        idxs = self.dataframe[self.dataframe['Status'] == Status.READY_PREPROCESS.name].index
-        done_indices = idxs[[i for i, done in enumerate(done_mask) if done]]
-
-        self.dataframe.loc[done_indices, 'Status'] = Status.READY_TRACKING.name
-
         # Show popup summary
-        done_count = self.dataframe[self.dataframe['Status'] == Status.READY_TRACKING.name].shape[0]
-        total = self.dataframe.shape[0]
+        done_count = sum(done_mask)
+        total = len(files_loaded)
         not_ready = total - done_count
 
         QMessageBox.information(
@@ -366,17 +352,6 @@ class MainWindow(QMainWindow):
 
         # Optionally refresh your UI table here
         self.update_progress_table()
-        # Save dataframe changes if needed
-        if self.dataframe_path:
-            self.dataframe.to_csv(self.dataframe_path, index=False)
-
-
-    def on_video_points_data_changed(self, updated_df: pd.DataFrame):
-        self.dataframe = updated_df.copy()
-        self.update_progress_table()
-        # Save to CSV file immediately
-        if self.dataframe_path:
-            self.dataframe.to_csv(self.dataframe_path, index=False)
 
 
 if __name__ == "__main__":
