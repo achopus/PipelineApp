@@ -35,11 +35,11 @@ def check_folders(source_folder: str, preprocessing_folder: str, tracking_folder
 
     status = {video: Status.LOADED for video in videos_source}
     
-    points = [Path(point).name for point in os.listdir(point_folder)]
+    points = [Path(point).stem for point in os.listdir(point_folder)]
     if len(videos_source):
         for video in videos_source:
             assert video in status.keys()
-            if Path(video).name in points:
+            if Path(video).stem in points:
                 status[video] = Status.READY_PREPROCESS
     else:
         return status    

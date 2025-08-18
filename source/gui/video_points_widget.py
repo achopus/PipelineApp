@@ -1,12 +1,10 @@
 import os
 from pathlib import Path
 import numpy as np
-import json
 import cv2
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout,
     QMessageBox, QSizePolicy, QFrame, QListWidget, QListWidgetItem,
-    QApplication
 )
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor, QGuiApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint
@@ -114,26 +112,41 @@ class VideoPointsWidget(QWidget):
 
         self.video_label.mousePressEvent = self.on_click
 
-        self.populate_video_list()
+        self.populate_video_list(create_new=True)
         self.load_video(self.current_index)
         self.setWindowTitle("Video Points Annotator")
         self.showMaximized()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setFocus()
 
-    def populate_video_list(self):
-        points = [Path(p).name for p in os.listdir(os.path.join(Path(self.video_folder).parent, 'points'))]
-        for i, video in self.videos:
-            filename = Path(video).name
+    def populate_video_list(self, create_new: bool = False):
+        points = [Path(p).stem for p in os.listdir(os.path.join(Path(self.video_folder).parent, 'points'))]
+        #self.video_list.clear()
+
+        for i, video in enumerate(self.videos):
+            filename = Path(video).stem
             annotated = filename in points
-            item = QListWidgetItem(f"{i+1}. {Path(filename).stem}") # type: ignore
-            if annotated:
-                item.setForeground(QColor("white"))
-                item.setBackground(QColor("green"))
+            if create_new:
+                item = QListWidgetItem(f"{i+1}. {filename}") # type: ignore
+                if annotated:
+                    item.setForeground(QColor("white"))
+                    item.setBackground(QColor("green"))
+                else:
+                    item.setForeground(QColor("white"))
+                    item.setBackground(QColor("darkred"))
+                self.video_list.addItem(item)
             else:
-                item.setForeground(QColor("white"))
-                item.setBackground(QColor("darkred"))
-            self.video_list.addItem(item)
+                item_existing = self.video_list.item(i)
+                if item_existing is not None:
+                    if annotated:
+                        item_existing.setForeground(QColor("white"))
+                        item_existing.setBackground(QColor("green"))
+                    elif i in self.points_per_video.keys() and len(self.points_per_video[i]) == 4:
+                        item_existing.setForeground(QColor("white"))
+                        item_existing.setBackground(QColor("orange"))
+                    else:
+                        item_existing.setForeground(QColor("white"))
+                        item_existing.setBackground(QColor("darkred"))
 
     def on_video_list_clicked(self, item):
         # Parse the clicked item's index from the text
@@ -143,6 +156,7 @@ class VideoPointsWidget(QWidget):
             idx = int(idx_str) - 1
             if 0 <= idx < len(self.videos):
                 self.load_video(idx)
+                self.populate_video_list()
         except Exception:
             pass
 
@@ -157,18 +171,18 @@ class VideoPointsWidget(QWidget):
             self.cap.release()
             self.cap = None
 
-        video_path = self.videos[index]
+        video_path = os.path.join(self.video_folder, self.videos[index])
         self.cap = cv2.VideoCapture(video_path)
+        self.video_label.setFocus()
         if not self.cap.isOpened():
             QMessageBox.critical(self, "Error", f"Cannot open video:\n{video_path}")
             return
 
         points_list = []
-        points_path = os.path.join(Path(video_path).parent, 'points', Path(video_path).name.replace('.mp4', '.npy'))
+        points_path = os.path.join(Path(video_path).parent.parent, 'points', Path(video_path).name.replace('.mp4', '.npy'))
         if os.path.exists(points_path):
-            points_npy = np.load(points_path)
             try:
-                coords = np.load(points_npy)
+                coords = np.load(points_path)
                 # coords expected to be list of (x,y) in full-resolution coords
                 points_list = [QPoint(int(x), int(y)) for x, y in coords] # TODO Match this to implementation
             except Exception as e:
@@ -298,29 +312,28 @@ class VideoPointsWidget(QWidget):
             # Reset current video points
             self.points = []
             self.points_per_video[self.current_index] = []
+            # Remove saved points file if it exists
+            video_filepath = self.videos[self.current_index]
+            points_path = os.path.join(Path(self.video_folder).parent, 'points', Path(video_filepath).name.replace('.mp4', '.npy'))
+            if os.path.exists(points_path):
+                os.remove(points_path)
 
             self.update_frame()
 
             # Refresh video list colors
             self.populate_video_list()
-            self.save_progress()
+            # self.save_progress()
 
         else:
             super().keyPressEvent(event)
 
     def save_progress(self):
-        def has_points(val: str | None):
-            try:
-                if val is None: return False
-                return bool(val and val.strip())
-            except Exception as e:
-                return False
-
         self.points_per_video[self.current_index] = self.points
 
-
-        for video_name, point in self.points_per_video.items():
-            np.save(os.path.join(Path(self.video_folder).parent, 'points', Path(video_name).name.replace('.mp4', '.npy')), np.array([(p.x(), p.y()) for p in point]))
+        for idx, point in self.points_per_video.items():
+            if not len(point): continue
+            video_filepath = self.videos[idx]
+            np.save(os.path.join(Path(self.video_folder).parent, 'points', Path(video_filepath).name.replace('.mp4', '.npy')), np.array([(p.x(), p.y()) for p in point]))
 
         # Refresh video list colors
         self.populate_video_list()

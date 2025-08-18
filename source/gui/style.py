@@ -1,5 +1,7 @@
 from PyQt5.QtGui import QColor
 
+PROJECT_FOLDER = "//srv-fs.ad.nudz.cz/BV_data/TrackingPRC"
+
 DARK_STYLE = """
 QWidget {
     background-color: #2b2b2b;

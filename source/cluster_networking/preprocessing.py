@@ -18,11 +18,13 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
     files_to_process = [os.path.join(project_folder, "videos", file) for file in os.listdir(os.path.join(project_folder, "videos")) if file.endswith(('.mp4', '.avi'))]
     mask_done = [Path(file).name in completed_files for file in files_to_process]
     points = [os.path.join(project_folder, "points", Path(file).stem + ".npy") for file in files_to_process]
+    assert len(mask_done) == len(points) == len(files_to_process), "Mismatch in lengths of files, mask, and points."
     files_to_process = [f for f, m in zip(files_to_process, mask_done) if not m]
     points = [p for p, m in zip(points, mask_done) if not m]
     
     preprocessed_folder = convert_to_linux_path(preprocessed_folder)
     files_to_process = list(map(convert_to_linux_path, files_to_process))
+    points = list(map(convert_to_linux_path, points))
     
     preprocessing_function(files_to_process, points, preprocessed_folder)
     return True

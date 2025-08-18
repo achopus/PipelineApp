@@ -8,7 +8,8 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QTableWidget,
-    QTableWidgetItem, QAbstractItemView, QDialog, QSizePolicy, QMessageBox
+    QTableWidgetItem, QAbstractItemView, QDialog, QSizePolicy, QMessageBox,
+    QSpacerItem
 )
 from PyQt5.QtGui import QFont
 from gui.create_project import CreateProjectDialog, create_project_folder
@@ -18,10 +19,13 @@ from gui.video_points_widget import VideoPointsWidget
 from cluster_networking.preprocessing import cluster_preprocessing
 from cluster_networking.tracking import cluster_tracking
 
+
+from gui.style import PROJECT_FOLDER
 from file_management.active_file_check import check_folders
 from file_management.status import Status
 
 from typing import Dict
+from PyQt5.QtWidgets import QTextEdit
 
 
 class MainWindow(QMainWindow):
@@ -31,6 +35,7 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.setTabPosition(QTabWidget.North)
+        self.tabs.currentChanged.connect(self.on_tab_changed)
         
         self.folder_path: str | None = None
         self.status: Dict[str, Status] | None = None
@@ -101,6 +106,41 @@ class MainWindow(QMainWindow):
         yaml_layout.addWidget(self.number_of_videos)
         yaml_layout.addWidget(QLabel("Overall status:"))
         yaml_layout.addWidget(self.overall_status)
+        
+        # Manual field
+        manual_text = """
+            How to use this application:
+
+            1. Project Management:
+            \t- Create a new project or load an existing one
+            \t- For new projects, fill in project details and select videos
+
+            2. Video Points Annotation:
+            \t- Switch to tab 2
+            \t- Mark points of interest (arena corners) on your videos
+            \t- Click 'Process data on computational cluster' when done
+            \t  Note: This process may take a while!
+
+            3. Tracking:
+            \t- Switch to tab 3 after preprocessing is complete
+            \t- Click 'Run Tracking on Cluster' to start tracking
+            \t- Wait for results
+            \t  Note: This process may take a while (even days for larger datasets)
+
+            Note: Ensure all videos are properly annotated before processing.
+        """
+        manual_label = QLabel("Manual:")
+        manual_label.setFont(QFont("", 64))
+        manual_field = QTextEdit()
+        manual_field.setReadOnly(True)
+        manual_field.setText(manual_text)
+        manual_field.setMinimumWidth(900)
+        manual_field.setMinimumHeight(600)
+        manual_field.setFont(QFont("", 42))
+        manual_field.setStyleSheet("background-color: #21657E; border: 1px solid #ccc; padding: 10px;")
+        yaml_layout.addSpacerItem(QSpacerItem(0, 120))
+        yaml_layout.addWidget(manual_label)
+        yaml_layout.addWidget(manual_field)
 
         # Keep fields compact
         yaml_container = QWidget()
@@ -132,15 +172,19 @@ class MainWindow(QMainWindow):
         return tab
 
     def on_tab_changed(self):
-        self.update_progress_table()
+        try:
+            self.update_progress_table()
+        except Exception as e:
+            pass
 
     def load_yaml_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open YAML File", "", "YAML Files (*.yaml *.yml)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open YAML File", PROJECT_FOLDER, "YAML Files (*.yaml *.yml)")
         if not file_path:
             return
 
         with open(file_path, "r") as f:
             data = yaml.safe_load(f)
+        self.yaml_path = file_path
         self.folder_path =  os.path.dirname(file_path)
 
         self.project_name.setText(str(data.get("project_name", "")))
@@ -164,6 +208,7 @@ class MainWindow(QMainWindow):
         dialog = CreateProjectDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             self.yaml_path = create_project_folder(dialog)
+            self.folder_path = str(Path(self.yaml_path).parent)
             self.update_progress_table()
             self.project_name.setText(dialog.project_name.text())
             self.author_name.setText(dialog.author_name.text())
@@ -171,7 +216,6 @@ class MainWindow(QMainWindow):
             timestamp_str = datetime.now().strftime("%d.%m.%Y %H:%M")
             self.creation_time.setText(timestamp_str)
             print(f"New Project: {dialog.project_name.text()}, Author: {dialog.author_name.text()}, Folder: {dialog.folder_field.text()}")
-
 
             self.tabs.setTabEnabled(2, True)
             self.tabs.setTabEnabled(1, True)
@@ -223,19 +267,11 @@ class MainWindow(QMainWindow):
         
         btn_layout = QHBoxLayout()
 
-        btn_open_video = QPushButton("Open Video Annotation")
-        btn_open_video.setFixedSize(350, 30)
-
         btn_cluster = QPushButton("Process data on computational cluster")
-        btn_cluster.setFixedSize(450, 30)
-        
-        btn_check_status = QPushButton("Check preprocessing status")
-        btn_check_status.setFixedSize(400, 30)
-        
+        btn_cluster.setFixedSize(900, 60)
+        btn_cluster.setStyleSheet("font-size: 42px;")  # Increase font size for better visibility
 
-        btn_layout.addWidget(btn_open_video)
         btn_layout.addWidget(btn_cluster)
-        btn_layout.addWidget(btn_check_status)
         btn_layout.addStretch()
         
         layout.addLayout(btn_layout)
@@ -243,7 +279,6 @@ class MainWindow(QMainWindow):
 
         # Container widget for VideoPointsWidget, added below buttons when opened
         self.video_points_container = QWidget()
-        #self.video_points_container.setVisible(False)
         layout.addWidget(self.video_points_container)
 
         self.video_points_tab.setLayout(layout)
@@ -251,7 +286,7 @@ class MainWindow(QMainWindow):
 
         def open_video_annotation():
             if self.video_widget is None:
-                self.video_widget = VideoPointsWidget("videos") # pyright: ignore[reportArgumentType]
+                self.video_widget = VideoPointsWidget(os.path.join(self.folder_path, "videos"))  # pyright: ignore
                 v_layout = QVBoxLayout()
                 v_layout.setContentsMargins(0, 0, 0, 0)
                 self.video_points_container.setLayout(v_layout)
@@ -261,13 +296,12 @@ class MainWindow(QMainWindow):
                 self.video_points_container.setVisible(True)
                 
         def preprocessing_wrapper():
-            #self.video_points_container.setVisible(False)
             succes_flag = cluster_preprocessing(self.yaml_path)
             if succes_flag:
                 QMessageBox.information(
                     self,
                     "Preprocessing Status",
-                    "Sending all annotated videos to cluster for preprocessing. Check on their status with the 'Check preprocessing status' button."
+                    "Sending all annotated videos to cluster for preprocessing."
                 )
             else:
                 QMessageBox.warning(
@@ -276,13 +310,11 @@ class MainWindow(QMainWindow):
                     "No preprocessing could have been done. Please annotate your data first!"
                 )
             
-            
-        btn_open_video.clicked.connect(open_video_annotation)
+        open_video_annotation()
         btn_cluster.clicked.connect(preprocessing_wrapper)
-        btn_check_status.clicked.connect(self.check_preprocessing_status)
+
         
     def enable_trackres_tab(self):
-        
         layout = QVBoxLayout()
         btn_layout = QHBoxLayout()
 

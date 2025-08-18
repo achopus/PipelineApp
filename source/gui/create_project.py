@@ -8,7 +8,7 @@ from shutil import copy as shutil_copy
 
 from PyQt5.QtWidgets import QHBoxLayout, QComboBox, QLineEdit, QDialog, QVBoxLayout, QLabel, QPushButton, QFileDialog
 
-from typing import Tuple
+from gui.style import PROJECT_FOLDER
 
 class CreateProjectDialog(QDialog):
     """Dialog to create a new project."""
@@ -103,7 +103,6 @@ class CreateProjectDialog(QDialog):
             field.setStyleSheet("border: 1px solid red;")
             
 def create_project_folder(dialog: CreateProjectDialog) -> str:
-    PROJECT_FOLDER = "//srv-fs.ad.nudz.cz/BV_data/TrackingPRC"
     if not os.path.exists(PROJECT_FOLDER):
         os.mkdir(PROJECT_FOLDER)
     
@@ -136,5 +135,5 @@ def create_project_folder(dialog: CreateProjectDialog) -> str:
     with open(yaml_path, 'w') as f:
         yaml.dump(yaml_dict, f, default_flow_style=False, allow_unicode=True)
     
-    
+    print(yaml_path)
     return yaml_path
