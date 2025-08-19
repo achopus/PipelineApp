@@ -1,6 +1,12 @@
+"""
+Status enumeration for file processing states.
+"""
+
 from enum import Enum
 
+
 class Status(Enum):
+    """Enumeration of possible file processing statuses."""
     ERROR = -1
     LOADED = 1
     READY_PREPROCESS = 2

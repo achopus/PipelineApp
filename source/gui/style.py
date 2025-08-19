@@ -1,6 +1,13 @@
-from PyQt5.QtGui import QColor
+"""
+GUI styling and constants for the Pipeline Application.
+"""
 
-PROJECT_FOLDER = "//srv-fs.ad.nudz.cz/BV_data/TrackingPRC"
+import os
+from PyQt5.QtGui import QColor
+from dotenv import load_dotenv
+
+load_dotenv()
+PROJECT_FOLDER = os.getenv("PROJECT_FOLDER", "//srv-fs.ad.nudz.cz/BV_data/TrackingPRC")
 
 DARK_STYLE = """
 QWidget {
@@ -27,7 +34,7 @@ QHeaderView::section {
     border: 1px solid #555;
 }
 QTabBar::tab {
-    background-color:#21657E;
+    background-color: #21657E;
     padding: 6px;
     font-size: 25px;
     height: 40px;
@@ -36,7 +43,7 @@ QTabBar::tab {
 }
 QTabBar::tab:selected {
     background-color: #00868B;
-    font-size: 30 px
+    font-size: 30px;
 }
 """
 
@@ -46,5 +53,5 @@ STATUS_COLORS = {
     "READY_TRACKING": QColor("#006680"),   # Blue-teal
     "TRACKED": QColor("#008066"),          # Teal
     "RESULTS_DONE": QColor("#006633"),     # Deep green
-    "ERROR": QColor("#7D0000")             # Red (unchanged)
+    "ERROR": QColor("#7D0000")             # Red
 }

@@ -1,13 +1,21 @@
 import os
 import time
 from pathlib import Path
-from file_management.status import Status
-
 from typing import Dict
 
+from file_management.status import Status
 
 
 def check_preprocessing_status(video_path: str) -> Status:
+    """
+    Check the preprocessing status of a video file.
+    
+    Args:
+        video_path: Path to the video file
+        
+    Returns:
+        Status: Current status of the video file
+    """
     if os.path.exists(video_path):
         min_size_bytes = 5 * 1024 * 1024  # 5 MB
         min_mod_seconds = 30  # 30 seconds
@@ -20,20 +28,62 @@ def check_preprocessing_status(video_path: str) -> Status:
         else:
             return Status.PREPROCESSING_IN_PROGRESS
 
-    is_annotated = os.path.exists(os.path.join(Path(video_path).parent, 'points', Path(video_path).name.replace('.mp4', '.npy')))
+    # Check if video is annotated
+    points_path = os.path.join(
+        Path(video_path).parent, 
+        'points', 
+        Path(video_path).name.replace('.mp4', '.npy')
+    )
+    is_annotated = os.path.exists(points_path)
 
     return Status.READY_PREPROCESS if is_annotated else Status.LOADED
 
+
 def extract_tracking_name(tracking_path: str) -> str:
+    """Extract the base name from a tracking file path."""
     return tracking_path.split("DLC")[0]
 
 
-def check_folders(source_folder: str, preprocessing_folder: str, tracking_folder: str, point_folder: str, image_folder: str) -> Dict[str, Status]:
-    videos_source = [Path(video).stem for video in os.listdir(source_folder) if video.endswith((".mp4", ".avi"))]
-    videos_prepro = [Path(video).stem for video in os.listdir(preprocessing_folder) if video.endswith((".mp4", ".avi"))]
-    tracking = [Path(f).stem for f in os.listdir(tracking_folder) if f.endswith(".csv")]
-    images = [Path(f).stem for f in os.listdir(image_folder) if f.endswith((".jpg", ".png"))]
-    points = [Path(point).stem for point in os.listdir(point_folder) if point.endswith(".npy")]
+def check_folders(
+    source_folder: str, 
+    preprocessing_folder: str, 
+    tracking_folder: str, 
+    point_folder: str, 
+    image_folder: str
+) -> Dict[str, Status]:
+    """
+    Check the status of files across different project folders.
+    
+    Args:
+        source_folder: Path to source videos folder
+        preprocessing_folder: Path to preprocessed videos folder
+        tracking_folder: Path to tracking results folder
+        point_folder: Path to annotation points folder
+        image_folder: Path to result images folder
+        
+    Returns:
+        Dict mapping video names to their current status
+    """
+    videos_source = [
+        Path(video).stem for video in os.listdir(source_folder) 
+        if video.endswith((".mp4", ".avi"))
+    ]
+    videos_prepro = [
+        Path(video).stem for video in os.listdir(preprocessing_folder) 
+        if video.endswith((".mp4", ".avi"))
+    ]
+    tracking = [
+        Path(f).stem for f in os.listdir(tracking_folder) 
+        if f.endswith(".csv")
+    ]
+    images = [
+        Path(f).stem for f in os.listdir(image_folder) 
+        if f.endswith((".jpg", ".png"))
+    ]
+    points = [
+        Path(point).stem for point in os.listdir(point_folder) 
+        if point.endswith(".npy")
+    ]
 
     status = {video: Status.LOADED for video in videos_source}
     

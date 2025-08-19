@@ -21,7 +21,7 @@ def ssh_send_command(commands: list[str]):
 
         for command in commands:
             bg_command = f"{command} &"
-            print(f"Sending command in background: {bg_command}")
+            print(f"Sending command in background.")
             transport = client.get_transport()
             if transport is not None:
                 channel = transport.open_session()
@@ -33,7 +33,6 @@ def ssh_send_command(commands: list[str]):
 
     finally:
         client.close()
-
 
 def slurm_text_preprocessing(videos: list[str], keypoints: list[str], target_folder: str) -> list[str]:
     def generate_text(video_file: str, corners: str) -> str:
