@@ -9,11 +9,13 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 from cluster_networking.preprocessing import cluster_preprocessing
+from gui.scaling import get_scaling_manager
 from gui.video_points_widget import VideoPointsWidget
 
 
@@ -23,6 +25,7 @@ class VideoPointsAnnotationTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
+        self.scaling_manager = get_scaling_manager()
         self.video_widget: Optional[VideoPointsWidget] = None
         self.video_points_container: QWidget = QWidget()
         
@@ -33,9 +36,34 @@ class VideoPointsAnnotationTab(QWidget):
         
         btn_layout = QHBoxLayout()
 
-        btn_cluster = QPushButton("Process data on computational cluster")
-        btn_cluster.setFixedSize(900, 60)
-        btn_cluster.setStyleSheet("font-size: 42px;")  # Increase font size for better visibility
+        btn_cluster = QPushButton("⬆️ Process data on computational cluster")
+        btn_cluster.setToolTip("Send all annotated videos to the cluster for processing")
+        btn_cluster.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                            stop:0 #4CAF50, stop:1 #388E3C);
+                border: 2px solid #66BB6A;
+                border-radius: 10px;
+                color: white;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                            stop:0 #66BB6A, stop:1 #4CAF50);
+                border: 2px solid #81C784;
+
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                            stop:0 #388E3C, stop:1 #2E7D32);
+
+            }
+        """)
+        btn_cluster.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        scaled_height = self.scaling_manager.scale_size(60)
+        if isinstance(scaled_height, tuple):
+            scaled_height = scaled_height[1]
+        btn_cluster.setMinimumHeight(scaled_height)
 
         btn_layout.addWidget(btn_cluster)
         btn_layout.addStretch()

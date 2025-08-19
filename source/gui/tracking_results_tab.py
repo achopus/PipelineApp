@@ -49,22 +49,37 @@ class TrackingResultsTab(QWidget):
         
         # Left side layout - more compact
         left_layout = QVBoxLayout()
-        left_layout.setSpacing(5)  # Reduce spacing between elements
-        left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # Align to top
+        left_layout.setSpacing(10)
+        left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        # Compact button layout
+        # Compact button layout with improved styling
         btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(5)  # Reduce spacing between buttons
-        btn_run_tracking = QPushButton("Run Tracking")  # Shorter text
-        btn_run_tracking.setFixedSize(150, 60)  # Smaller buttons
-        btn_calculate_results = QPushButton("Get Results")  # Shorter text
-        btn_calculate_results.setFixedSize(150, 60)
+        btn_layout.setSpacing(10)
         
-        # Add buttons to open folders
-        btn_open_images = QPushButton("Open Images")
-        btn_open_results = QPushButton("Open Results")
-        btn_open_images.setFixedSize(150, 60)
-        btn_open_results.setFixedSize(150, 60)
+        def create_action_button(text, icon, color_start, color_end):
+            button = QPushButton(f"{icon} {text}")
+            button.setFixedSize(250, 50)
+            button.setFont(QFont("Segoe UI", 10, QFont.Bold))
+            button.setStyleSheet(f"""
+                QPushButton {{
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 {color_start}, stop:1 {color_end});
+                    border: 2px solid {color_start};
+                    border-radius: 8px;
+                    color: white;
+                }}
+                QPushButton:hover {{
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 {color_end}, stop:1 {color_start});
+                    border: 2px solid {color_end};
+                }}
+            """)
+            return button
+        
+        btn_run_tracking = create_action_button("Run Tracking", "🚀", "#FF5722", "#D84315")
+        btn_calculate_results = create_action_button("Get Results", "📊", "#9C27B0", "#7B1FA2")
+        btn_open_images = create_action_button("Open Images", "🖼️", "#FF9800", "#F57C00")
+        btn_open_results = create_action_button("Open Results", "📁", "#607D8B", "#455A64")
         
         def open_images_folder():
             """Open the images folder in the system file explorer."""
@@ -110,25 +125,94 @@ class TrackingResultsTab(QWidget):
         # Create progress text field
         self.metrics_progress_text = QTextEdit()
         self.metrics_progress_text.setReadOnly(True)
-        self.metrics_progress_text.setMaximumHeight(100)
-        self.metrics_progress_text.setStyleSheet("background-color: #21657E; border: 1px solid #ccc; padding: 10px;")
-        self.metrics_progress_text.setFont(QFont("", 32))  # Set font size to 32
+        self.metrics_progress_text.setMaximumHeight(120)
+        self.metrics_progress_text.setStyleSheet("""
+            QTextEdit {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                           stop:0 #2d4f5a, stop:1 #1e3a42);
+                border: 2px solid #4a90a4;
+                border-radius: 8px;
+                padding: 15px;
+                color: #e6f3f7;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 24px;
+                font-weight: 500;
+                selection-background-color: #4a90a4;
+            }
+            QTextEdit:focus {
+                border-color: #66c2d9;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                           stop:0 #325a66, stop:1 #234049);
+            }
+        """)
         self.metrics_progress_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.metrics_progress_text.setText("Metrics can be calculated once the tracking is done.")
+        self.metrics_progress_text.setText("📊 Metrics can be calculated once the tracking is completed.")
         left_layout.addWidget(self.metrics_progress_text)
-        left_layout.addStretch(1)
+        left_layout.addStretch(0)
 
         # Compact image viewer
         image_viewer = QWidget()
+        image_viewer.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                           stop:0 #2a2a2a, stop:1 #1e1e1e);
+                border: 2px solid #444444;
+                border-radius: 12px;
+                margin: 5px;
+            }
+        """)
         image_layout = QVBoxLayout()
-        image_layout.setSpacing(25)  # Minimal spacing
-        image_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+        image_layout.setSpacing(15)
+        image_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Add trajectory preview title
+        trajectory_title = QLabel("Trajectory preview")
+        trajectory_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        trajectory_title.setStyleSheet("""
+            QLabel {
+                color: #e6f3f7;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 18px;
+                font-weight: bold;
+                padding: 10px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                           stop:0 #3a6b7a, stop:1 #2d5463);
+                border-radius: 6px;
+                border: 1px solid #4a90a4;
+                margin-bottom: 10px;
+            }
+        """)
+        image_layout.addWidget(trajectory_title)
         
         image_label = QLabel()
         image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image_label.setMaximumSize(746, 600)  # Limit image size
+        image_label.setMaximumSize(746, 600)
+        image_label.setStyleSheet("""
+            QLabel {
+                background-color: #1a1a1a;
+                border: 2px dashed #666666;
+                border-radius: 8px;
+                color: #999999;
+                font-size: 14px;
+                padding: 20px;
+            }
+        """)
+        
         file_label = QLabel()
         file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        file_label.setStyleSheet("""
+            QLabel {
+                color: #e6f3f7;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 14px;
+                font-weight: 600;
+                padding: 8px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                           stop:0 #3a6b7a, stop:1 #2d5463);
+                border-radius: 6px;
+                border: 1px solid #4a90a4;
+            }
+        """)
 
         # Center the labels by wrapping them in a widget
         label_container = QWidget()
@@ -140,11 +224,46 @@ class TrackingResultsTab(QWidget):
 
         # Compact navigation
         nav_layout = QHBoxLayout()
-        nav_layout.setSpacing(2)
-        prev_button = QPushButton("< Previous")  # Shorter text
-        next_button = QPushButton("Next >")
-        prev_button.setFixedSize(100, 40)  # Tiny buttons
-        next_button.setFixedSize(100, 40)
+        nav_layout.setSpacing(10)
+        
+        def create_nav_button(text, icon):
+            button = QPushButton(f"{icon} {text}")
+            button.setFixedSize(120, 45)
+            button.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                               stop:0 #4a6b7a, stop:1 #3a5463);
+                    color: white;
+                    border: 2px solid #5a8a9a;
+                    border-radius: 8px;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    font-size: 12px;
+                    font-weight: 600;
+                    padding: 8px 16px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                               stop:0 #5a7b8a, stop:1 #4a6473);
+                    border-color: #6a9aaa;
+
+                }
+                QPushButton:pressed {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                               stop:0 #3a5b6a, stop:1 #2a4453);
+                    border-color: #4a7a8a;
+
+                }
+                QPushButton:disabled {
+                    background: #2a2a2a;
+                    color: #666666;
+                    border-color: #444444;
+                }
+            """)
+            return button
+            
+        prev_button = create_nav_button("Previous", "◀")
+        next_button = create_nav_button("Next", "▶")
+        
         nav_layout.addStretch()
         nav_layout.addWidget(prev_button)
         nav_layout.addWidget(next_button)
@@ -155,6 +274,7 @@ class TrackingResultsTab(QWidget):
         image_layout.addLayout(nav_layout)
         image_viewer.setLayout(image_layout)
         left_layout.addWidget(image_viewer)
+        left_layout.addStretch(1)
 
         # Right side - Metrics table
         right_layout = QVBoxLayout()
@@ -162,13 +282,13 @@ class TrackingResultsTab(QWidget):
         self.metrics_table = QTableWidget()
         self.metrics_table.setColumnCount(1)
         self.metrics_table.setHorizontalHeaderLabels(["Metrics will be shown here once the computation is done."])
-        self.metrics_table.setColumnWidth(0, 400)
+        self.metrics_table.setColumnWidth(0, 600)
         right_layout.addWidget(metrics_label)
         right_layout.addWidget(self.metrics_table)
 
         # Combine layouts with more space for right side
-        main_layout.addLayout(left_layout, stretch=1)
-        main_layout.addLayout(right_layout, stretch=2)
+        main_layout.addLayout(left_layout, stretch=0)
+        main_layout.addLayout(right_layout, stretch=1)
         
         self.setLayout(main_layout)
 

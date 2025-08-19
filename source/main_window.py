@@ -12,17 +12,23 @@ from typing import Dict, Optional
 import pandas as pd
 from pandas import DataFrame
 from PyQt5.QtWidgets import (
+    QAction,
     QApplication,
     QDialog,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QTabWidget,
+    QWidget
 )
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 # Local application imports
 from file_management.status import Status
 from gui.project_management_tab import ProjectManagementTab
-from gui.style import DARK_STYLE
+from gui.scaling import get_scaling_manager
+from gui.style import get_scaled_dark_style
 from gui.tracking_results_tab import TrackingResultsTab
 from gui.video_points_annotation_tab import VideoPointsAnnotationTab
 from metric_calculation.metrics_pipeline import run_metrics_pipeline
@@ -34,6 +40,9 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        
+        # Initialize scaling manager first
+        self.scaling_manager = get_scaling_manager()
         self.setWindowTitle("Video tracking")
 
         # Initialize data attributes
@@ -58,13 +67,79 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.project_management_tab, "1. Project Management")
         self.tabs.addTab(self.video_points_tab, "2. Video Points Annotation")
         self.tabs.addTab(self.tracking_results_tab, "3. Animal tracking + Results")
+        # Set tab bar style for wider tabs
+        self.tabs.setStyleSheet("""
+            QTabBar::tab {
+                min-width: 400px;
+                padding: 10px;
+                font-size: 12pt;
+            }
+        """)
+
+        # Create exit button in top right
+        self.create_exit_button()
 
         # Initially disable tabs 2 and 3
         self.tabs.setTabEnabled(1, False)
         self.tabs.setTabEnabled(2, False)
 
         self.setCentralWidget(self.tabs)
-        self.showMaximized()
+        
+        # Start maximized
+        self.showFullScreen()
+
+    def create_exit_button(self) -> None:
+        """Create an exit button in the top right corner."""
+        # Create menu bar
+        self.menubar = self.menuBar()
+        if self.menubar is None:
+            return
+        
+        # Create exit action
+        exit_action = QAction("❌ Exit", self)
+        exit_action.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        exit_action.setStatusTip('Exit application')
+        exit_action.triggered.connect(self.close_application)
+        self.menubar.addAction(exit_action)
+        
+        # Style the menu bar with right alignment for the exit button
+        self.menubar.setStyleSheet("""
+            QMenuBar {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+                border-bottom: 2px solid #4dd0e1;
+                padding: 5px;
+                font-size: 12pt;
+                text-align: right;
+            }
+            QMenuBar::item {
+                background-color: transparent;
+                padding: 8px 16px;
+                margin: 2px;
+                border-radius: 6px;
+                float: right;
+            }
+            QMenuBar::item:selected {
+                background-color: #ff4444;
+                color: white;
+            }
+            QMenuBar::item:pressed {
+                background-color: #cc3333;
+            }
+        """)
+
+    def close_application(self) -> None:
+        """Close the application with confirmation."""
+        reply = QMessageBox.question(
+            self, 
+            'Exit Application', 
+            'Are you sure you want to exit?',
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.close()
 
     def on_tab_changed(self) -> None:
         """Handle tab change events."""
@@ -166,9 +241,18 @@ class MainWindow(QMainWindow):
 def main():
     """Main entry point for the application."""
     app = QApplication(sys.argv)
-    app.setStyleSheet(DARK_STYLE)
-
+    
+    # Set application properties for better rendering
+    app.setApplicationName("Video Tracking Pipeline")
+    app.setApplicationDisplayName("PipelineApp")
+    app.setApplicationVersion("0.1.0")
+    
+    # Create and show the main window
     window = MainWindow()
+    
+    # Apply the enhanced dark style to the main window instead of the entire app
+    window.setStyleSheet(get_scaled_dark_style())
+    
     window.show()
     
     sys.exit(app.exec_())

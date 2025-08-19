@@ -8,16 +8,30 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor, QGuiApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint
+from PyQt5.QtCore import Qt as QtCore
+from gui.scaling import get_scaling_manager
 
 class VideoPointsWidget(QWidget):
     def __init__(self, video_folder: str):
         super().__init__()
+        self.scaling_manager = get_scaling_manager()
         self.video_folder = video_folder
         self.videos = os.listdir(video_folder)
         self.current_index = 0
         self.points_per_video = {}  # Dict[int, List[QPoint]]  (stored as full-resolution coords)
         self.points = []  # Current video points (full-res coords)
         self.display_scale = 1.0  # scale factor from full-res -> displayed
+        
+        # Calculate optimal video display size based on screen resolution
+        screen_rect = self.scaling_manager.screen_rect
+        if screen_rect is not None:
+            # Use 85% of screen width for video, ensuring it fits well (increased from 70%)
+            self.max_video_width = int(screen_rect.width())
+            self.max_video_height = int(screen_rect.height())
+        else:
+            # Fallback values (increased proportionally)
+            self.max_video_width = 1500
+            self.max_video_height = 1000
 
         # Colors and corner labels
         self.corner_colors = [
@@ -44,12 +58,26 @@ class VideoPointsWidget(QWidget):
         self.btn_prev = QPushButton("<<< Previous Video")
         self.btn_next = QPushButton("Next Video >>>")
         self.btn_save = QPushButton("Save")
+        
+        # Scale buttons based on screen size
+        btn_height = self.scaling_manager.scale_size(40)
+        if isinstance(btn_height, tuple):
+            btn_height = btn_height[1]
+        
+        for btn in [self.btn_prev, self.btn_next, self.btn_save]:
+            btn.setMinimumHeight(btn_height)
+            btn.setFont(QFont("Segoe UI", self.scaling_manager.scale_font_size(12)))
+        
         btn_layout.addWidget(self.btn_prev)
         btn_layout.addWidget(self.btn_next)
         btn_layout.addWidget(self.btn_save)
         left_layout.addLayout(btn_layout)
+        
+        # Add stretch to push everything to the top
+        left_layout.addStretch()
 
         main_layout.addLayout(left_layout)
+        main_layout.addStretch(1)
 
         # Right side: legend + points text + video list
         right_layout = QVBoxLayout()
@@ -94,8 +122,13 @@ class VideoPointsWidget(QWidget):
 
         # Video list widget for direct access
         self.video_list = QListWidget()
-        self.video_list.setMaximumWidth(300)
+        # Scale the video list width (increased from 300 to 400)
+        list_width = self.scaling_manager.scale_size(600)
+        if isinstance(list_width, tuple):
+            list_width = list_width[0]
+        self.video_list.setMaximumWidth(list_width)
         self.video_list.itemClicked.connect(self.on_video_list_clicked)
+        
         right_layout.addWidget(QLabel("Videos:"))
         right_layout.addWidget(self.video_list)
 
@@ -115,38 +148,74 @@ class VideoPointsWidget(QWidget):
         self.populate_video_list(create_new=True)
         self.load_video(self.current_index)
         self.setWindowTitle("Video Points Annotator")
-        self.showMaximized()
+        
+        # Use scaling manager to determine window mode
+        if self.scaling_manager.should_use_fullscreen():
+            self.showFullScreen()
+        else:
+            optimal_size = self.scaling_manager.get_optimal_window_size()
+            self.resize(*optimal_size)
+            self.show()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setFocus()
 
     def populate_video_list(self, create_new: bool = False):
         points = [Path(p).stem for p in os.listdir(os.path.join(Path(self.video_folder).parent, 'points'))]
-        #self.video_list.clear()
+        # self.video_list.clear()
+
+        # Set the complete styling for the video list widget
+        base_font_size = self.scaling_manager.scale_font_size(10)
+        
+        self.video_list.setStyleSheet(f"""
+                QListWidget {{
+                    background-color: #3c3f41;
+                    border: 2px solid #555;
+                    border-radius: 8px;
+                    color: #f0f0f0;
+                    font-size: {base_font_size}pt;
+                    padding: 4px;
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                }}
+                QListWidget::item:selected {{
+                    /* Selection border instead of background change */
+                    border: 2px solid #4a90e2;
+                    background-color: #4a90e2;
+                    color: white;
+                }}""")
 
         for i, video in enumerate(self.videos):
             filename = Path(video).stem
             annotated = filename in points
             if create_new:
                 item = QListWidgetItem(f"{i+1}. {filename}") # type: ignore
-                if annotated:
-                    item.setForeground(QColor("white"))
-                    item.setBackground(QColor("green"))
-                else:
-                    item.setForeground(QColor("white"))
-                    item.setBackground(QColor("darkred"))
                 self.video_list.addItem(item)
+                # Set colors after adding to the list widget
+                if annotated:
+                    # Green: annotated and saved
+                    item.setBackground(QColor("green"))
+                    item.setForeground(QColor("white"))
+                else:
+                    # Red: not annotated
+                    item.setBackground(QColor("red"))
+                    item.setForeground(QColor("white"))
             else:
                 item_existing = self.video_list.item(i)
                 if item_existing is not None:
                     if annotated:
-                        item_existing.setForeground(QColor("white"))
+                        # Green: annotated and saved
                         item_existing.setBackground(QColor("green"))
+                        item_existing.setForeground(QColor("white"))
                     elif i in self.points_per_video.keys() and len(self.points_per_video[i]) == 4:
-                        item_existing.setForeground(QColor("white"))
+                        # Orange: annotated but not saved
                         item_existing.setBackground(QColor("orange"))
-                    else:
                         item_existing.setForeground(QColor("white"))
-                        item_existing.setBackground(QColor("darkred"))
+                    else:
+                        # Red: not annotated
+                        item_existing.setBackground(QColor("red"))
+                        item_existing.setForeground(QColor("white"))
+        
+        # Force the widget to repaint to ensure colors are visible
+        self.video_list.repaint()
 
     def on_video_list_clicked(self, item):
         # Parse the clicked item's index from the text
@@ -243,30 +312,55 @@ class VideoPointsWidget(QWidget):
 
         pixmap = QPixmap.fromImage(qt_img)
 
-        # Scale pixmap to display size (keep aspect ratio)
-        w_display = self.video_label.width()
-        h_display = self.video_label.height()
-        pixmap = pixmap.scaled(w_display, h_display, Qt.AspectRatioMode.KeepAspectRatio)
+        # Calculate optimal display size based on screen resolution
+        # Scale video to fit within max dimensions while maintaining aspect ratio
+        original_w = pixmap.width()
+        original_h = pixmap.height()
+        
+        # Calculate scale to fit within max dimensions
+        scale_w = self.max_video_width / original_w
+        scale_h = self.max_video_height / original_h
+        scale = min(scale_w, scale_h, 1.0)  # Don't upscale beyond original
+        
+        display_w = int(original_w * scale)
+        display_h = int(original_h * scale)
+        
+        # Update display scale for accurate point mapping
+        self.display_scale = scale
+        
+        # Set the video label size first
+        self.video_label.setFixedSize(display_w, display_h)
+        
+        # Scale pixmap to calculated display size
+        pixmap = pixmap.scaled(display_w, display_h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
         painter = QPainter(pixmap)
+        
+        # Scale point drawing based on display scale
+        point_size = max(4, int(8 * self.scaling_manager.scale_factor))
+        
         for idx, pt in enumerate(self.points):
             # pt holds full-resolution coords; convert to display coords
             dx = int(round(pt.x() * self.display_scale))
             dy = int(round(pt.y() * self.display_scale))
             color = self.corner_colors[idx] if idx < len(self.corner_colors) else QColor('red')
-            pen = QPen(color, 8)
+            pen = QPen(color, point_size)
             painter.setPen(pen)
             painter.drawPoint(dx, dy)
 
         # Draw video index and filename top-left corner (display coords)
         painter.setPen(QColor('white'))
         font = QFont()
-        font.setPointSize(16)
+        scaled_font_size = self.scaling_manager.scale_font_size(16)
+        font.setPointSize(scaled_font_size)
         font.setBold(True)
         painter.setFont(font)
 
         text = f"{self.current_index + 1} / {len(self.videos)} : {Path(self.videos[self.current_index]).stem}"
-        painter.drawText(10, 30, text)
+        text_margin = self.scaling_manager.scale_size(10)
+        if isinstance(text_margin, tuple):
+            text_margin = text_margin[0]
+        painter.drawText(text_margin, scaled_font_size + 10, text)
 
         painter.end()
 
@@ -331,7 +425,7 @@ class VideoPointsWidget(QWidget):
         self.points_per_video[self.current_index] = self.points
 
         for idx, point in self.points_per_video.items():
-            if not len(point): continue
+            if len(point) != 4: continue
             video_filepath = self.videos[idx]
             np.save(os.path.join(Path(self.video_folder).parent, 'points', Path(video_filepath).name.replace('.mp4', '.npy')), np.array([(p.x(), p.y()) for p in point]))
 
