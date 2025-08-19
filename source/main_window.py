@@ -166,7 +166,12 @@ class MainWindow(QMainWindow):
     def enable_statistical_analysis_tab(self) -> None:
         """Enable and set up the statistical analysis tab."""
         self.tabs.setTabEnabled(3, True)
-        # Refresh data in the statistical analysis tab if it has metrics
+        # Defer the data refresh to prevent window flashes during YAML loading
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(100, self._delayed_refresh_statistical_tab)
+    
+    def _delayed_refresh_statistical_tab(self) -> None:
+        """Delayed refresh of statistical analysis tab data."""
         if hasattr(self.statistical_analysis_tab, 'refresh_data'):
             self.statistical_analysis_tab.refresh_data()
 

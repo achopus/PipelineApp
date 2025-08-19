@@ -20,6 +20,7 @@ A comprehensive PyQt5-based GUI application for automated behavioral analysis of
 - **Trajectory Analysis**: Position tracking and movement patterns
 - **Behavioral Metrics**: Distance traveled, velocity, thigmotaxis, center exploration
 - **Time-binned Analysis**: Configurable time windows for temporal analysis
+- **Statistical Analysis**: Comprehensive statistical testing with t-tests, ANOVA, and two-way ANOVA
 - **Visualization**: Publication-ready trajectory plots with heatmaps
 
 ### **Cluster Integration**
@@ -36,6 +37,7 @@ A comprehensive PyQt5-based GUI application for automated behavioral analysis of
 - OpenCV
 - NumPy, Pandas, SciPy
 - Matplotlib
+- Statsmodels (for two-way ANOVA)
 - SSH access to a SLURM cluster (for processing)
 
 ### Setup
@@ -47,7 +49,7 @@ A comprehensive PyQt5-based GUI application for automated behavioral analysis of
 
 2. **Install dependencies**
    ```bash
-   pip install PyQt5 opencv-python numpy pandas scipy matplotlib paramiko python-dotenv pyyaml tqdm
+   pip install PyQt5 opencv-python numpy pandas scipy matplotlib paramiko python-dotenv pyyaml tqdm statsmodels
    ```
 
 3. **Configure environment variables**
@@ -100,6 +102,18 @@ A comprehensive PyQt5-based GUI application for automated behavioral analysis of
   - View trajectory visualizations
   - Export results as CSV
 
+### 4. Statistical Analysis
+- **Tab 4: Statistical Analysis**
+  - Load CSV results with parsed filename components
+  - Select grouping factors based on your filename structure
+  - Choose behavioral metrics for analysis
+  - Run statistical tests:
+    - **t-test**: Compare exactly 2 groups
+    - **One-way ANOVA**: Compare 2+ groups with one factor
+    - **Two-way ANOVA**: Analyze two factors and their interaction
+  - View comprehensive results with effect sizes and significance
+  - Export statistical results for publication
+
 ## 📊 Metrics Calculated
 
 ### **Movement Metrics**
@@ -119,6 +133,42 @@ A comprehensive PyQt5-based GUI application for automated behavioral analysis of
 ### **Behavioral Indicators**
 - **Exploration**: Center exploration vs wall-following behavior
 - **Anxiety-like Behavior**: Thigmotaxis and center avoidance measures
+
+## 📈 Statistical Analysis Features
+
+### **Automated Filename Parsing**
+- Automatically parses filenames into separate columns based on YAML configuration
+- Creates grouping factors from filename structure (e.g., Subject, Treatment, Dosage)
+- Enables complex experimental design analysis
+
+### **Statistical Tests**
+- **Independent t-test**: Compare behavioral metrics between 2 groups
+  - Levene's test for equal variances
+  - Welch's t-test for unequal variances
+  - Effect size and confidence intervals
+
+- **One-way ANOVA**: Compare behavioral metrics across multiple groups
+  - F-statistics and p-values
+  - Degrees of freedom
+  - Post-hoc comparisons (planned)
+
+- **Two-way ANOVA**: Analyze interaction effects between two factors
+  - Main effects for each factor
+  - Interaction effects (Factor A × Factor B)
+  - R² and adjusted R² for model fit
+  - Comprehensive effect size analysis
+
+### **Results Presentation**
+- **Summary View**: Text-based results with statistical significance indicators
+- **Detailed Table**: Organized results for each effect and metric
+- **Export Functionality**: Save results for publication and further analysis
+- **Real-time Processing**: Threaded analysis prevents UI freezing
+
+### **Experimental Design Support**
+- **Multi-factor Designs**: Analyze complex experimental designs with multiple grouping variables
+- **Interaction Analysis**: Understand how factors combine to affect behavior
+- **Effect Size Reporting**: R² values show practical significance beyond statistical significance
+- **Group Comparisons**: Detailed descriptive statistics for each experimental condition
 
 ## 🏗️ Project Structure
 
@@ -140,6 +190,7 @@ PipelineApp/
 │   │   ├── video_points_annotation_tab.py # Video annotation interface
 │   │   ├── video_points_widget.py  # Video annotation widget
 │   │   ├── tracking_results_tab.py # Results and metrics interface
+│   │   ├── statistical_analysis_tab.py # Statistical analysis interface
 │   │   └── style.py                # GUI styling and constants
 │   └── metric_calculation/         # Behavioral analysis modules
 │       ├── metrics_pipeline.py     # Main metrics calculation pipeline
@@ -222,6 +273,12 @@ For questions or issues:
 2. Review the processing logs for error messages
 3. Ensure cluster connectivity and credentials are correct
 4. Verify video file formats and filename structure
+5. **For statistical analysis**: See the [Statistical Analysis Manual](STATISTICAL_ANALYSIS_MANUAL.md) for detailed usage guide
+
+## 📚 Documentation
+
+- **[Statistical Analysis Manual](STATISTICAL_ANALYSIS_MANUAL.md)**: Comprehensive guide for the statistical analysis functionality
+- **README.md**: This overview and installation guide
 
 ---
 

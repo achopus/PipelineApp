@@ -71,7 +71,7 @@ class ProjectManagementTab(QWidget):
 
         # ----- LEFT SIDE -----
         left_widget = QWidget()
-        left_widget.setMinimumHeight(600)  # Ensure scrollable content
+        # Remove artificial height constraint - let content determine size
         left_layout = QVBoxLayout(left_widget)
 
         # Buttons with improved styling
@@ -236,6 +236,7 @@ class ProjectManagementTab(QWidget):
    • Create a new project or load an existing one
    • For new projects, fill in project details and select videos
    • Configure filename structure for organized data
+   • Filename structure enables statistical analysis grouping
 
 🎬 2. Video Points Annotation:
    • Switch to tab 2 after creating/loading a project
@@ -254,10 +255,25 @@ class ProjectManagementTab(QWidget):
    • Export trajectory visualizations and CSV data
    ⚠️ Note: This process may take time (even days for large datasets)
 
+📊 4. Statistical Analysis:
+   • Switch to tab 4 after metrics are calculated
+   • Load CSV data with automatically parsed filename components
+   • Choose statistical test type:
+     - t-test: Compare 2 groups (e.g., Control vs Treatment)
+     - One-way ANOVA: Compare 2+ groups with one factor
+     - Two-way ANOVA: Analyze two factors + their interaction
+   • Select grouping factors from your filename structure
+   • Choose behavioral metrics to analyze
+   • View comprehensive results with significance testing
+   • Export publication-ready statistical reports
+
 💡 Tips:
    • Ensure all videos are properly annotated before processing
    • Check file status in the progress table below
    • Use consistent lighting and camera angles for best results
+   • Plan filename structure carefully for statistical analysis
+   • Balance group sizes for optimal statistical power
+   • See Statistical Analysis Manual for detailed guidance
         """
         
         manual_label = QLabel("📋 User Manual")
@@ -267,11 +283,8 @@ class ProjectManagementTab(QWidget):
         manual_field = QTextEdit()
         manual_field.setReadOnly(True)
         manual_field.setText(manual_text)
-        manual_field.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        scaled_manual_height = self.scaling_manager.scale_size(450)
-        if isinstance(scaled_manual_height, tuple):
-            scaled_manual_height = scaled_manual_height[1]
-        manual_field.setMinimumHeight(scaled_manual_height)
+        manual_field.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)  # Changed from Expanding to Preferred
+        # Remove fixed height constraint - let it size naturally based on content
         manual_field.setFont(QFont("Segoe UI", self.scaling_manager.scale_font_size(11), QFont.Normal))
         manual_field.setStyleSheet("""
             QTextEdit {
@@ -292,9 +305,9 @@ class ProjectManagementTab(QWidget):
         # Keep fields compact
         yaml_container = QWidget()
         yaml_container.setLayout(yaml_layout)
-        yaml_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        yaml_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)  # Changed from Expanding to Preferred
         left_layout.addWidget(yaml_container)
-        left_layout.addStretch()
+        # Removed addStretch() - let scroll area handle the space management
 
         # ----- RIGHT SIDE -----
         right_widget = QWidget()
@@ -383,9 +396,8 @@ class ProjectManagementTab(QWidget):
             self.metrics_dataframe = pd.read_csv(metrics_dataframe_path)
             if self.parent_window:
                 self.parent_window.metrics_dataframe = self.metrics_dataframe
-                # Enable statistical analysis tab since we have metrics data
-                self.parent_window.enable_statistical_analysis_tab()
 
+        # Update UI fields first
         self.project_name.setText(str(data.get("project_name", "")))
         self.author_name.setText(str(data.get("author", "")))
         self.experiment_type.setText(str(data.get("experiment_type", "")))
@@ -404,18 +416,30 @@ class ProjectManagementTab(QWidget):
         else:
             self.filename_structure.setText("No filename structure defined")
         
-        self.update_progress_table()
-
+        # Hide buttons immediately
         self.btn_load_yaml.setVisible(False)
         self.btn_create_project.setVisible(False)
         
-        # Enable other tabs
+        # Defer heavy UI operations to prevent flashing
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(50, self._complete_yaml_loading)
+
+    def _complete_yaml_loading(self) -> None:
+        """Complete the YAML loading process with deferred UI operations."""
+        # Update progress table
+        self.update_progress_table()
+        
+        # Enable other tabs and update metrics
         if self.parent_window:
             self.parent_window.tabs.setTabEnabled(2, True)
             self.parent_window.tabs.setTabEnabled(1, True)
             self.parent_window.enable_video_points_tab()
             self.parent_window.enable_tracking_tab()
             self.parent_window.update_metrics_table()
+            
+            # Enable statistical analysis tab if we have metrics data
+            if self.metrics_dataframe is not None:
+                self.parent_window.enable_statistical_analysis_tab()
 
     def create_project(self) -> None:
         """Create a new project using the project creation dialog."""
