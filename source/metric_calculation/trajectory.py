@@ -82,7 +82,8 @@ def remove_small_clusters(arr : NDArray, cluster_size: int) -> NDArray:
 
     return arr
 
-def calculate_body_size(dataframe: DataFrame, arena_side_cm: float = 80.0, corner_x_px: int = 1100, corner_y_px: int = 100) -> Tuple[float, float]:
+def calculate_body_size(dataframe: DataFrame, arena_side_cm: float = 80.0,  arena_side_px: int = 1000, corner_px: int = 100,
+                        detection_threshold: float = 0.9, on_line_threshold: float = 0.25) -> Tuple[float, float]:
     trajectory_nose = dataframe.nose
     trajectory_neck = dataframe.neck
     trajectory_tail = dataframe.tail_start
@@ -103,18 +104,20 @@ def calculate_body_size(dataframe: DataFrame, arena_side_cm: float = 80.0, corne
 
     X = np.hstack([x_nose[:, None], x_neck[:, None], x_tail[:, None]])
     Y = np.hstack([y_nose[:, None], y_neck[:, None], y_tail[:, None]])
-    X = (X - corner_x_px) * (arena_side_cm / 100)
-    Y = (Y - corner_y_px) * (arena_side_cm / 100)
     
+    transformation_coefficient = arena_side_cm / arena_side_px
+    X = (X - corner_px) * transformation_coefficient
+    Y = (Y - corner_px) * transformation_coefficient
+
     L = np.hstack([l_nose[:, None], l_neck[:, None], l_tail[:, None]])
-    mask = L.min(1) > 0.95
+    mask = L.min(1) > detection_threshold
     X = X[mask, :]
     Y = Y[mask, :]
     
-    body_size = np.sqrt((X[:, 1] - X[:, 2])**2 + (Y[:, 1] - Y[:, 2])**2)
-    head_size = np.sqrt((X[:, 0] - X[:, 1])**2 + (Y[:, 0] - Y[:, 1])**2)
+    head_size = np.sqrt((X[:, 1] - X[:, 2])**2 + (Y[:, 1] - Y[:, 2])**2)
+    body_size = np.sqrt((X[:, 0] - X[:, 1])**2 + (Y[:, 0] - Y[:, 1])**2)
     on_line = point_to_line_distance(X, Y)
-    on_line_mask = on_line < 0.25
+    on_line_mask = on_line < on_line_threshold
     body_size = body_size[on_line_mask]
     head_size = head_size[on_line_mask]
     body_size = np.median(body_size)
@@ -123,8 +126,8 @@ def calculate_body_size(dataframe: DataFrame, arena_side_cm: float = 80.0, corne
     return float(body_size), float(head_size)
 
 def calculate_trajectory(dataframe: DataFrame,
-                         arena_side_cm: float = 80, corner_x_px: int = 1100, corner_y_px: int = 100,
-                         detection_threshold: float = 0.6, motion_blur: float = 2) -> DataFrame:
+                         arena_side_cm: float = 80, arena_size_px: int = 1000,corner_px: int = 100,
+                         detection_threshold: float = 0.6, motion_blur_sigma: float = 2) -> DataFrame:
     timestamps = dataframe['timestamps'].values
     time_step = timestamps[1] - timestamps[0] if len(timestamps) > 1 else 1
     
@@ -148,8 +151,9 @@ def calculate_trajectory(dataframe: DataFrame,
     Y = np.hstack([y_nose[:, None], y_neck[:, None], y_tail[:, None]])
     L = np.hstack([l_nose[:, None], l_neck[:, None], l_tail[:, None]])
 
-    X = (X - corner_x_px) * (arena_side_cm / 100)
-    Y = (Y - corner_y_px) * (arena_side_cm / 100)
+    transformation_coefficient = arena_side_cm / arena_size_px
+    X = (X - corner_px) * transformation_coefficient
+    Y = (Y - corner_px) * transformation_coefficient
     X = (X * L).sum(1) / L.sum(1)
     Y = (Y * L).sum(1) / L.sum(1)
     X[L.max(1) < detection_threshold] = np.nan
@@ -158,8 +162,8 @@ def calculate_trajectory(dataframe: DataFrame,
     X = remove_small_clusters(X, 1 * int(1 / time_step))
     Y = remove_small_clusters(Y, 1 * int(1 / time_step))
     
-    X = gaussian_blur_nan(X, sigma=motion_blur)
-    Y = gaussian_blur_nan(Y, sigma=motion_blur)
+    X = gaussian_blur_nan(X, sigma=motion_blur_sigma)
+    Y = gaussian_blur_nan(Y, sigma=motion_blur_sigma)
 
     df_center = pd.DataFrame(data={
         "x": X,

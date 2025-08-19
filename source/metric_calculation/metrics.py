@@ -117,6 +117,6 @@ def calculate_metrics(frame: DataFrame, arena_size_cm: float = 80.0, body_size: 
         i += 1
         if time_start > max_time or time_start > frame["timestamps"].iloc[-1]: break
         distance = get_total_distance(velocity, time, t_start=time_start, t_end=time_end)
-        metrics[f"distance_{time_start}_to_{time_end}"] = distance
+        metrics[f"D_{int(time_start) // 60}_to_{int(time_end) // 60}"] = distance
 
     return metrics

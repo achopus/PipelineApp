@@ -25,17 +25,18 @@ def check_preprocessing_status(video_path: str) -> Status:
     return Status.READY_PREPROCESS if is_annotated else Status.LOADED
 
 def extract_tracking_name(tracking_path: str) -> str:
-    return tracking_path.split("DLC")[0] + ".mp4"
+    return tracking_path.split("DLC")[0]
 
 
-def check_folders(source_folder: str, preprocessing_folder: str, tracking_folder: str, point_folder: str) -> Dict[str, Status]:
-    videos_source = os.listdir(source_folder)
-    videos_prepro = os.listdir(preprocessing_folder)
-    tracking = [f for f in os.listdir(tracking_folder) if f.endswith(".csv")]
+def check_folders(source_folder: str, preprocessing_folder: str, tracking_folder: str, point_folder: str, image_folder: str) -> Dict[str, Status]:
+    videos_source = [Path(video).stem for video in os.listdir(source_folder) if video.endswith((".mp4", ".avi"))]
+    videos_prepro = [Path(video).stem for video in os.listdir(preprocessing_folder) if video.endswith((".mp4", ".avi"))]
+    tracking = [Path(f).stem for f in os.listdir(tracking_folder) if f.endswith(".csv")]
+    images = [Path(f).stem for f in os.listdir(image_folder) if f.endswith((".jpg", ".png"))]
+    points = [Path(point).stem for point in os.listdir(point_folder) if point.endswith(".npy")]
 
     status = {video: Status.LOADED for video in videos_source}
     
-    points = [Path(point).stem for point in os.listdir(point_folder)]
     if len(videos_source):
         for video in videos_source:
             assert video in status.keys()
@@ -56,6 +57,12 @@ def check_folders(source_folder: str, preprocessing_folder: str, tracking_folder
             track_modified = extract_tracking_name(track)
             assert track_modified in status.keys()
             status[track_modified] = Status.TRACKED
+            
+    if len(images):
+        source_names = [Path(video).stem for video in videos_source]
+        for image in images:
+            assert Path(image).stem in source_names
+            status[image] = Status.RESULTS_DONE
 
     return status
 

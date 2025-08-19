@@ -41,11 +41,10 @@ QTabBar::tab:selected {
 """
 
 STATUS_COLORS = {
-    "LOADED": QColor("#3A004B"),               # neutral gray
-    "READY_PREPROCESS": QColor("#2C3C00"),  # light green
-    "ERROR": QColor("#7D0000"),                # light red/pink
-    "READY_TRACKING": QColor("#826300"),
-    "TRACKED": QColor("#005213"),
-    "RESULTS_DONE": QColor("#000456")
-    # add more exact matches here
+    "LOADED": QColor("#2B0066"),           # Deep purple
+    "READY_PREPROCESS": QColor("#004D99"), # Deep blue
+    "READY_TRACKING": QColor("#006680"),   # Blue-teal
+    "TRACKED": QColor("#008066"),          # Teal
+    "RESULTS_DONE": QColor("#006633"),     # Deep green
+    "ERROR": QColor("#7D0000")             # Red (unchanged)
 }

@@ -5,13 +5,17 @@ from pathlib import Path
 import time
 from datetime import datetime
 
+import pandas as pd
+from pandas import DataFrame
+
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QTableWidget,
     QTableWidgetItem, QAbstractItemView, QDialog, QSizePolicy, QMessageBox,
     QSpacerItem
 )
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap
+from PyQt5.QtCore import Qt
 from gui.create_project import CreateProjectDialog, create_project_folder
 from gui.style import DARK_STYLE, STATUS_COLORS
 
@@ -23,6 +27,9 @@ from cluster_networking.tracking import cluster_tracking
 from gui.style import PROJECT_FOLDER
 from file_management.active_file_check import check_folders
 from file_management.status import Status
+
+from metric_calculation.metrics_pipeline import run_metrics_pipeline
+from metric_calculation.utils import construct_metric_dataframe
 
 from typing import Dict
 from PyQt5.QtWidgets import QTextEdit
@@ -39,6 +46,8 @@ class MainWindow(QMainWindow):
         
         self.folder_path: str | None = None
         self.status: Dict[str, Status] | None = None
+        self.metrics: Dict[str, Dict[str, float]] = {}
+        self.metrics_dataframe: DataFrame | None = None
 
         self.project_tab = self.create_project_management_tab()
         self.video_points_tab = QWidget()  # empty container for tab 2 content
@@ -186,6 +195,9 @@ class MainWindow(QMainWindow):
             data = yaml.safe_load(f)
         self.yaml_path = file_path
         self.folder_path =  os.path.dirname(file_path)
+        metrics_dataframe_path = os.path.join(self.folder_path, "results", "metrics_dataframe.csv")
+        if os.path.exists(metrics_dataframe_path):
+            self.metrics_dataframe = pd.read_csv(metrics_dataframe_path)
 
         self.project_name.setText(str(data.get("project_name", "")))
         self.author_name.setText(str(data.get("author", "")))
@@ -203,6 +215,7 @@ class MainWindow(QMainWindow):
 
         self.enable_video_points_tab()
         self.enable_trackres_tab()
+        self.update_metrics_table()
 
     def create_project(self):
         dialog = CreateProjectDialog(self)
@@ -229,7 +242,8 @@ class MainWindow(QMainWindow):
         preprocessin_folder = os.path.join(str(self.folder_path), "videos_preprocessed")
         tracking_folder = os.path.join(str(self.folder_path), "tracking")
         points_folder = os.path.join(str(self.folder_path), "points")
-        self.status = check_folders(source_folder, preprocessin_folder, tracking_folder, points_folder)
+        image_folder = os.path.join(str(self.folder_path), "images")
+        self.status = check_folders(source_folder, preprocessin_folder, tracking_folder, points_folder, image_folder)
         self.number_of_videos.setText(str(len(self.status)))
         self.table.setRowCount(len(self.status))
         for row, (k, v) in enumerate(self.status.items()):
@@ -315,24 +329,241 @@ class MainWindow(QMainWindow):
 
         
     def enable_trackres_tab(self):
-        layout = QVBoxLayout()
+        main_layout = QHBoxLayout()  # Main horizontal layout to split left/right sides
+        
+        # Left side layout - more compact
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(5)  # Reduce spacing between elements
+        left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # Align to top
+        
+        # Compact button layout
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(5)  # Reduce spacing between buttons
+        btn_run_tracking = QPushButton("Run Tracking")  # Shorter text
+        btn_run_tracking.setFixedSize(150, 60)  # Smaller buttons
+        btn_calculate_results = QPushButton("Get Results")  # Shorter text
+        btn_calculate_results.setFixedSize(150, 60)
+        # Add buttons to open folders
+        btn_open_images = QPushButton("Open Images")
+        btn_open_results = QPushButton("Open Results")
+        btn_open_images.setFixedSize(150, 60)
+        btn_open_results.setFixedSize(150, 60)
+        
+        def open_images_folder():
+            if self.folder_path:
+                images_path = os.path.join(self.folder_path, "images")
+                images_path = images_path.replace("/", "\\")  # Normalize path for cross-platform compatibility
+                if os.path.exists(images_path):
+                    if sys.platform == 'win32':
+                        os.startfile(images_path)
+                    elif sys.platform == 'darwin':
+                        os.system(f'open "{images_path}"')
+                    else:
+                        os.system(f'xdg-open "{images_path}"')
 
-        btn_run_tracking = QPushButton("Run Tracking on Cluster")
-        btn_run_tracking.setFixedSize(350, 30)
+        def open_results_folder():
+            if self.folder_path:
+                results_path = os.path.join(self.folder_path, "results")
+                results_path = results_path.replace("/", "\\")
+                if os.path.exists(results_path):
+                    if sys.platform == 'win32':
+                        os.startfile(results_path)
+                    elif sys.platform == 'darwin':
+                        os.system(f'open "{results_path}"')
+                    else:
+                        os.system(f'xdg-open "{results_path}"')
 
+        btn_open_images.clicked.connect(open_images_folder)
+        btn_open_results.clicked.connect(open_results_folder)
+
+        btn_layout.addStretch()
         btn_layout.addWidget(btn_run_tracking)
         btn_layout.addStretch()
+        btn_layout.addWidget(btn_calculate_results)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_open_images)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_open_results)
+        btn_layout.addStretch()
+        left_layout.addLayout(btn_layout)
+        left_layout.addStretch(1)
+        
+        
+        # Create progress text field
+        self.metrics_progress_text = QTextEdit()
+        self.metrics_progress_text.setReadOnly(True)
+        self.metrics_progress_text.setMaximumHeight(100)
+        self.metrics_progress_text.setStyleSheet("background-color: #21657E; border: 1px solid #ccc; padding: 10px;")
+        self.metrics_progress_text.setFont(QFont("", 32))  # Set font size to 32
+        self.metrics_progress_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.metrics_progress_text.setText("Metrics can be calculated once the tracking is done.")
+        left_layout.addWidget(self.metrics_progress_text)
+        left_layout.addStretch(1)
 
-        layout.addLayout(btn_layout)
+        # Compact image viewer
+        image_viewer = QWidget()
+        image_layout = QVBoxLayout()
+        image_layout.setSpacing(25)  # Minimal spacing
+        image_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+        
+        image_label = QLabel()
+        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        image_label.setMaximumSize(746, 600)  # Limit image size
+        file_label = QLabel()
+        file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.tracking_tab.setLayout(layout)
+        # Center the labels by wrapping them in a widget
+        label_container = QWidget()
+        container_layout = QVBoxLayout()
+        container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        container_layout.addWidget(file_label)
+        container_layout.addWidget(image_label)
+        label_container.setLayout(container_layout)
+
+        # Compact navigation
+        nav_layout = QHBoxLayout()
+        nav_layout.setSpacing(2)
+        prev_button = QPushButton("< Previous")  # Shorter text
+        next_button = QPushButton("Next >")
+        prev_button.setFixedSize(100, 40)  # Tiny buttons
+        next_button.setFixedSize(100, 40)
+        nav_layout.addStretch()
+        nav_layout.addWidget(prev_button)
+        nav_layout.addWidget(next_button)
+        nav_layout.addStretch()
+
+        image_layout.addWidget(file_label)
+        image_layout.addWidget(image_label)
+        image_layout.addLayout(nav_layout)
+        image_viewer.setLayout(image_layout)
+        left_layout.addWidget(image_viewer)
+
+        # Right side - Metrics table (unchanged)
+        right_layout = QVBoxLayout()
+        metrics_label = QLabel("Calculated Metrics:")
+        self.metrics_table = QTableWidget()
+        self.metrics_table.setColumnCount(1)
+        self.metrics_table.setHorizontalHeaderLabels(["Metrics will be shown here once the computation is done."])
+        self.metrics_table.setColumnWidth(0, 400)
+        right_layout.addWidget(metrics_label)
+        right_layout.addWidget(self.metrics_table)
+
+        # Combine layouts with more space for right side
+        main_layout.addLayout(left_layout, stretch=1)
+        main_layout.addLayout(right_layout, stretch=2)
+        
+        self.tracking_tab.setLayout(main_layout)
+
+        # Image navigation logic
+        self.current_image_index = 0
+        self.image_files = []
+
+        def load_images() -> None:
+            if self.folder_path:
+                image_path = os.path.join(self.folder_path, "images")
+                if os.path.exists(image_path):
+                    self.image_files = [f for f in os.listdir(image_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+                    show_current_image()
+
+        def show_current_image() -> None:
+            if self.image_files and self.folder_path:
+                image_path = os.path.join(self.folder_path, "images", self.image_files[self.current_image_index])
+                pixmap = QPixmap(image_path)
+                scaled_pixmap = pixmap.scaled(746, 600, Qt.AspectRatioMode.KeepAspectRatio)
+                image_label.setPixmap(scaled_pixmap)
+                file_label.setText(self.image_files[self.current_image_index])
+
+        def next_image():
+            if self.image_files:
+                self.current_image_index = (self.current_image_index + 1) % len(self.image_files)
+                show_current_image()
+
+        def prev_image():
+            if self.image_files:
+                self.current_image_index = (self.current_image_index - 1) % len(self.image_files)
+                show_current_image()
+
+        next_button.clicked.connect(next_image)
+        prev_button.clicked.connect(prev_image)
+        
         self.tabs.setTabEnabled(2, True)  # Ensure tab 3 is enabled
 
         def run_tracking():
             cluster_tracking(self.yaml_path)  # type: ignore
+            
+        def calculate_results():
+            self.metrics_pipeline_wrapper()
+            load_images()
 
+        load_images()
         btn_run_tracking.clicked.connect(run_tracking)
+        btn_calculate_results.clicked.connect(calculate_results)
+
+    # Update the metrics_pipeline_wrapper method
+    def update_metrics_progress(self, i: int, n: int, video_name: str):
+        self.metrics_progress_text.setText(f"Processing video {i+1} of {n}: {video_name}")
+        QApplication.processEvents()
+
+    def metrics_pipeline_wrapper(self):
+        if self.folder_path is None:
+            return
+        source_videos = os.listdir(os.path.join(self.folder_path, "videos"))
+        trackings = [tr for tr in os.listdir(os.path.join(self.folder_path, "tracking")) if tr.endswith(".csv")]
+        
+        pairs = []
+        for video_file in source_videos:
+            video_name = Path(video_file).stem
+            for tracking_file in trackings:
+                tracking_name = Path(tracking_file).stem
+                if video_name in tracking_name:
+                    pairs.append((video_file, tracking_file))
+                    break
+        
+        n_pairs = len(pairs)
+        if n_pairs == 0:
+            no_data_dialog = QDialog(self)
+            no_data_dialog.setWindowTitle("No tracking data to process.")
+            no_data_dialog.resize(600, 200)  # Make the window bigger
+            no_data_layout = QVBoxLayout()
+            progress_label = QLabel(f"No tracking data found for video: {video_name}")
+            progress_label.setFont(QFont("", 14))
+            no_data_layout.addWidget(progress_label)
+            no_data_dialog.setLayout(no_data_layout)
+            no_data_dialog.setModal(True)
+            no_data_dialog.exec_()
+            return
+
+
+        for i, (video_path, frame_path) in enumerate(pairs):
+            metrics = run_metrics_pipeline(frame_path=os.path.join(self.folder_path, "tracking", frame_path),
+                     source_video_path=os.path.join(self.folder_path, "videos", video_path),
+                     save_path=os.path.join(self.folder_path, "images", f"{Path(video_path).stem}.png"))
+            self.metrics[Path(video_path).name] = metrics
+            if self.status is not None:
+                self.status[Path(video_path).name] = Status.RESULTS_DONE
+            self.update_metrics_progress(i, n_pairs, video_path)
+        
+        self.metrics_progress_text.setText("Metrics calculation completed.")
+        QApplication.processEvents()
+        self.update_progress_table()
+        
+        self.metrics_dataframe = construct_metric_dataframe(self.metrics)
+        self.metrics_dataframe.to_csv(os.path.join(self.folder_path, "results", "metrics_dataframe.csv"), index=False)
+        self.metrics_dataframe.to_excel(os.path.join(self.folder_path, "results", "metrics_dataframe.xlsx"), index=False)
+        self.update_metrics_table()
+
+    def update_metrics_table(self) -> None:
+        if self.metrics_dataframe is not None:
+            self.metrics_table.setRowCount(len(self.metrics_dataframe))
+            self.metrics_table.setColumnCount(len(self.metrics_dataframe.columns))
+            self.metrics_table.setHorizontalHeaderLabels(self.metrics_dataframe.columns)
+            for i, column in enumerate(self.metrics_dataframe.columns):
+                for j, value in enumerate(self.metrics_dataframe[column]):
+                    if column != 'Filename':
+                        value = round(value, 2)
+                    item = QTableWidgetItem(str(value))
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable) # type: ignore
+                    self.metrics_table.setItem(j, i, item)
 
     def check_preprocessing_status(self):
         project_folder = os.path.dirname(self.yaml_path)

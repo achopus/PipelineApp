@@ -38,8 +38,7 @@ def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
 def plot_trajectory_figure(df: DataFrame, save_path: str, arena_side_cm: float = 80,
                            start_time: float = 0, end_time: float = np.inf) -> None:
     df = df[(df['timestamps'] >= start_time) & (df['timestamps'] <= end_time)]
-    X, Y, T = df['x'].values, df['y'].values, df['timestamps'].values
-
+    X, Y, T = df['x'].to_numpy(), df['y'].to_numpy(), df['timestamps'].to_numpy()
     # Setup
     fig, ax = plt.subplots()
     plt.rcParams.update({'font.weight': 'normal', 'font.size': 14})
@@ -68,10 +67,10 @@ def plot_trajectory_figure(df: DataFrame, save_path: str, arena_side_cm: float =
 
     # Geometry
     plt.axis('equal')
-    #plt.xlim(-b-0.1, arena_side_cm+b+0.1)
-    #plt.ylim(-b-0.1, arena_side_cm+b+0.1)
+    plt.xlim(-b-0.1, arena_side_cm+b+0.1)
+    plt.ylim(-b-0.1, arena_side_cm+b+0.1)
     for spine in ax.spines.values():
         spine.set_linewidth(3)  # Set the thickness of the border
 
-    plt.savefig(save_path, dpi=600)
+    plt.savefig(save_path, dpi=600, bbox_inches='tight')
     plt.close(fig)
