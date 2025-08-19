@@ -78,7 +78,8 @@ class ProjectManagementTab(QWidget):
         self.experiment_type = QLineEdit()
         self.creation_time = QLineEdit()
         self.number_of_videos = QLineEdit()
-        self.overall_status = QLineEdit()
+
+        self.filename_structure = QTextEdit()
 
         for field in (
             self.project_name, 
@@ -86,11 +87,16 @@ class ProjectManagementTab(QWidget):
             self.experiment_type, 
             self.creation_time, 
             self.number_of_videos, 
-            self.overall_status
         ):
             field.setReadOnly(True)
             field.setMinimumWidth(300)
             field.setFont(QFont("", 16))  # Set font size to 16
+
+        # Special formatting for filename structure field
+        self.filename_structure.setReadOnly(True)
+        self.filename_structure.setMinimumWidth(300)
+        self.filename_structure.setMaximumHeight(80)
+        self.filename_structure.setFont(QFont("", 14))
 
         yaml_layout = QVBoxLayout()
         yaml_layout.setSpacing(10)
@@ -104,8 +110,8 @@ class ProjectManagementTab(QWidget):
         yaml_layout.addWidget(self.creation_time)
         yaml_layout.addWidget(QLabel("Number of videos:"))
         yaml_layout.addWidget(self.number_of_videos)
-        yaml_layout.addWidget(QLabel("Overall status:"))
-        yaml_layout.addWidget(self.overall_status)
+        yaml_layout.addWidget(QLabel("Filename Structure:"))
+        yaml_layout.addWidget(self.filename_structure)
         
         # Manual field
         manual_text = """
@@ -207,6 +213,16 @@ Note: Ensure all videos are properly annotated before processing.
         timestamp_formatted = datetime.fromisoformat(timestamp_str).strftime("%d.%m.%Y %H:%M")
         self.creation_time.setText(timestamp_formatted)
         
+        # Display filename structure information
+        filename_structure = data.get("filename_structure", {})
+        if filename_structure:
+            field_names = filename_structure.get("field_names", [])
+            num_fields = filename_structure.get("num_fields", len(field_names))
+            description = filename_structure.get("description", f"{num_fields} fields: " + " _ ".join(field_names))
+            self.filename_structure.setText(description)
+        else:
+            self.filename_structure.setText("No filename structure defined")
+        
         self.update_progress_table()
 
         self.btn_load_yaml.setVisible(False)
@@ -224,29 +240,41 @@ Note: Ensure all videos are properly annotated before processing.
         """Create a new project using the project creation dialog."""
         dialog = CreateProjectDialog(self)
         if dialog.exec_() == QDialog.Accepted:
-            self.yaml_path = create_project_folder(dialog)
-            self.folder_path = str(Path(self.yaml_path).parent)
-            
-            # Update parent window attributes
-            if self.parent_window:
-                self.parent_window.yaml_path = self.yaml_path
-                self.parent_window.folder_path = self.folder_path
-            
-            self.update_progress_table()
-            
-            self.project_name.setText(dialog.project_name.text())
-            self.author_name.setText(dialog.author_name.text())
-            self.experiment_type.setText(dialog.dropdown.currentText())
-            
-            timestamp_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-            self.creation_time.setText(timestamp_str)
+            try:
+                self.yaml_path = create_project_folder(dialog)
+                self.folder_path = str(Path(self.yaml_path).parent)
+                
+                # Update parent window attributes
+                if self.parent_window:
+                    self.parent_window.yaml_path = self.yaml_path
+                    self.parent_window.folder_path = self.folder_path
+                
+                self.update_progress_table()
+                
+                self.project_name.setText(dialog.project_name.text())
+                self.author_name.setText(dialog.author_name.text())
+                self.experiment_type.setText(dialog.dropdown.currentText())
+                
+                timestamp_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+                self.creation_time.setText(timestamp_str)
+                
+                # Display filename structure information
+                field_names = dialog.get_field_names()
+                num_fields = dialog.num_fields_spin.value()
+                description = f"{num_fields} fields: " + " _ ".join(field_names)
+                self.filename_structure.setText(description)
 
-            # Enable other tabs
-            if self.parent_window:
-                self.parent_window.tabs.setTabEnabled(2, True)
-                self.parent_window.tabs.setTabEnabled(1, True)
-                self.parent_window.enable_video_points_tab()
-                self.parent_window.enable_tracking_tab()
+                # Enable other tabs
+                if self.parent_window:
+                    self.parent_window.tabs.setTabEnabled(2, True)
+                    self.parent_window.tabs.setTabEnabled(1, True)
+                    self.parent_window.enable_video_points_tab()
+                    self.parent_window.enable_tracking_tab()
+                    
+            except (ValueError, RuntimeError) as e:
+                QMessageBox.critical(self, "Error", f"Failed to create project:\n{str(e)}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Unexpected error during project creation:\n{str(e)}")
                 
             self.btn_load_yaml.setVisible(False)
             self.btn_create_project.setVisible(False)
