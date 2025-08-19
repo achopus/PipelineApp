@@ -7,6 +7,9 @@ from typing import Tuple, Union, Optional
 from PyQt5.QtWidgets import QApplication, QDesktopWidget
 from PyQt5.QtCore import QRect
 from PyQt5.QtGui import QScreen
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ScalingManager:
@@ -48,9 +51,9 @@ class ScalingManager:
         self._font_scale_factor = max(0.8, min(1.3, self._scale_factor))
         
         if self._screen_rect is not None:
-            print(f"Screen resolution: {self._screen_rect.width()}x{self._screen_rect.height()}")
-            print(f"Scale factor: {self._scale_factor:.2f}")
-            print(f"Font scale factor: {self._font_scale_factor:.2f}")
+            logger.debug(f"Screen resolution: {self._screen_rect.width()}x{self._screen_rect.height()}")
+            logger.debug(f"Scale factor: {self._scale_factor:.2f}")
+            logger.debug(f"Font scale factor: {self._font_scale_factor:.2f}")
     
     @property
     def scale_factor(self) -> float:

@@ -2,6 +2,7 @@
 SSH handling and SLURM job management for cluster operations.
 """
 
+import logging
 import os
 import time
 from pathlib import Path
@@ -9,6 +10,9 @@ from typing import List, Optional, Tuple
 
 import paramiko
 from dotenv import load_dotenv
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class SSHConnectionError(Exception):
@@ -82,13 +86,13 @@ def ssh_send_command(commands: List[str], max_retries: int = 3, retry_delay: flo
         bool: True if all commands were sent successfully, False otherwise
     """
     if not commands:
-        print("No commands to send.")
+        logger.warning("No commands to send")
         return True
     
     try:
         host, port, username, password = validate_ssh_config()
     except ValueError as e:
-        print(f"SSH configuration error: {e}")
+        logger.error(f"SSH configuration error: {e}")
         return False
 
     client = paramiko.SSHClient()
@@ -96,7 +100,7 @@ def ssh_send_command(commands: List[str], max_retries: int = 3, retry_delay: flo
 
     for attempt in range(max_retries):
         try:
-            print(f"Attempting SSH connection to {host}:{port} (attempt {attempt + 1}/{max_retries})")
+            logger.info(f"Attempting SSH connection to {host}:{port} (attempt {attempt + 1}/{max_retries})")
             client.connect(
                 hostname=host,
                 port=port,
@@ -105,12 +109,12 @@ def ssh_send_command(commands: List[str], max_retries: int = 3, retry_delay: flo
                 timeout=30
             )
             
-            print(f"Successfully connected to {host}")
+            logger.info(f"Successfully connected to {host}")
             
             successful_commands = 0
             for i, command in enumerate(commands):
                 try:
-                    print(f"Sending command {i+1}/{len(commands)} in background")
+                    logger.debug(f"Sending command {i+1}/{len(commands)} in background")
                     transport = client.get_transport()
                     if transport is not None:
                         channel = transport.open_session()
@@ -121,32 +125,32 @@ def ssh_send_command(commands: List[str], max_retries: int = 3, retry_delay: flo
                         finally:
                             channel.close()
                     else:
-                        print("Error: SSH transport is not available. Command not sent.")
+                        logger.error("SSH transport is not available. Command not sent")
                         
                 except Exception as cmd_error:
-                    print(f"Error executing command {i+1}: {cmd_error}")
+                    logger.error(f"Error executing command {i+1}: {cmd_error}")
 
-            print(f"Successfully sent {successful_commands}/{len(commands)} commands")
+            logger.info(f"Successfully sent {successful_commands}/{len(commands)} commands")
             return successful_commands == len(commands)
             
         except paramiko.AuthenticationException:
-            print(f"Authentication failed for user {username}")
+            logger.error(f"Authentication failed for user {username}")
             return False
         except paramiko.SSHException as ssh_error:
-            print(f"SSH connection error (attempt {attempt + 1}): {ssh_error}")
+            logger.warning(f"SSH connection error (attempt {attempt + 1}): {ssh_error}")
             if attempt < max_retries - 1:
-                print(f"Retrying in {retry_delay} seconds...")
+                logger.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
             else:
-                print("Max retries reached. Connection failed.")
+                logger.error("Max retries reached. Connection failed")
                 return False
         except Exception as e:
-            print(f"Unexpected error (attempt {attempt + 1}): {e}")
+            logger.error(f"Unexpected error (attempt {attempt + 1}): {e}")
             if attempt < max_retries - 1:
-                print(f"Retrying in {retry_delay} seconds...")
+                logger.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
             else:
-                print("Max retries reached. Connection failed.")
+                logger.error("Max retries reached. Connection failed")
                 return False
         finally:
             try:

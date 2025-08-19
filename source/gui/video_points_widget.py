@@ -10,6 +10,9 @@ from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor, QGuiAppl
 from PyQt5.QtCore import Qt, QTimer, QPoint
 from PyQt5.QtCore import Qt as QtCore
 from gui.scaling import get_scaling_manager
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class VideoPointsWidget(QWidget):
     def __init__(self, video_folder: str):
@@ -255,7 +258,7 @@ class VideoPointsWidget(QWidget):
                 # coords expected to be list of (x,y) in full-resolution coords
                 points_list = [QPoint(int(x), int(y)) for x, y in coords] # TODO Match this to implementation
             except Exception as e:
-                print(f"Failed to load points for video index {index}: {e}")
+                logger.error(f"Failed to load points for video index {index}: {e}")
 
         if index not in self.points_per_video:
             self.points_per_video[index] = points_list

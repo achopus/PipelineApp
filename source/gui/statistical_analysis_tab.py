@@ -527,12 +527,7 @@ class StatisticalAnalysisTab(QWidget):
             self.update_data_status()
             self.populate_metrics_list()
             self.populate_factor_combo()
-            
-            # Debug information
-            print(f"Debug: Loaded {len(self.metrics_dataframe)} rows")
-            print(f"Debug: Columns: {list(self.metrics_dataframe.columns)}")
-            print(f"Debug: Grouping factors: {self.grouping_factors}")
-            
+
             self.analyze_btn.setEnabled(True)
             
         except Exception as e:

@@ -3,6 +3,7 @@ Main Window for the Video Tracking Pipeline Application.
 """
 
 # Standard library imports
+import logging
 import os
 import sys
 from pathlib import Path
@@ -34,6 +35,7 @@ from gui.tracking_results_tab import TrackingResultsTab
 from gui.video_points_annotation_tab import VideoPointsAnnotationTab
 from metric_calculation.metrics_pipeline import run_metrics_pipeline
 from metric_calculation.utils import construct_metric_dataframe
+from utils.logging_config import init_logging, get_logger
 
 
 class MainWindow(QMainWindow):
@@ -41,6 +43,11 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        
+        # Initialize logging
+        init_logging(log_level="INFO", console_output=True)
+        self.logger = get_logger(__name__)
+        self.logger.info("Initializing PipelineApp main window")
         
         # Initialize scaling manager first
         self.scaling_manager = get_scaling_manager()
@@ -259,12 +266,19 @@ class MainWindow(QMainWindow):
 
 def main():
     """Main entry point for the application."""
+    # Initialize logging before creating QApplication
+    init_logging(log_level="INFO", console_output=True)
+    logger = get_logger(__name__)
+    logger.info("Starting PipelineApp")
+    
     app = QApplication(sys.argv)
     
     # Set application properties for better rendering
     app.setApplicationName("Video Tracking Pipeline")
     app.setApplicationDisplayName("PipelineApp")
     app.setApplicationVersion("0.1.0")
+    
+    logger.info("Created QApplication, initializing main window")
     
     # Create and show the main window
     window = MainWindow()
@@ -273,6 +287,7 @@ def main():
     window.setStyleSheet(get_scaled_dark_style())
     
     window.show()
+    logger.info("Main window displayed, entering event loop")
     
     sys.exit(app.exec_())
 

@@ -7,6 +7,9 @@ import yaml
 import pandas as pd
 from typing import Dict, Optional
 from pandas import DataFrame
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def construct_metric_dataframe(metrics: Dict[str, Dict[str, float]], yaml_path: Optional[str] = None) -> DataFrame:
@@ -60,7 +63,7 @@ def construct_metric_dataframe(metrics: Dict[str, Dict[str, float]], yaml_path: 
                             filename_columns[field_name].append('')
         except Exception as e:
             # If parsing fails, fall back to just using the filename
-            print(f"Warning: Could not parse YAML filename structure: {e}")
+            logger.warning(f"Could not parse YAML filename structure: {e}")
             filename_columns = {}
     
     # Create the final data dictionary

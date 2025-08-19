@@ -8,6 +8,9 @@ from typing import Callable, List
 
 from cluster_networking.ssh_handling import slurm_text_preprocessing, ssh_send_command
 from cluster_networking.utils import convert_to_linux_path, validate_directory_exists, validate_file_exists
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def preprocessing_function(files_to_process: List[str], keypoints: List[str], target_folder: str) -> bool:
@@ -26,7 +29,7 @@ def preprocessing_function(files_to_process: List[str], keypoints: List[str], ta
         commands = slurm_text_preprocessing(files_to_process, keypoints, target_folder)
         return ssh_send_command(commands)
     except Exception as e:
-        print(f"Error in preprocessing function: {e}")
+        logger.error(f"Error in preprocessing function: {e}")
         return False
 
 
@@ -42,7 +45,7 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
         bool: True if preprocessing was initiated successfully
     """
     if not validate_file_exists(yaml_path):
-        print(f"Error: YAML file does not exist: {yaml_path}")
+        logger.error(f"YAML file does not exist: {yaml_path}")
         return False
         
     project_folder = os.path.dirname(yaml_path)
@@ -52,11 +55,11 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
     
     # Validate required directories exist
     if not validate_directory_exists(videos_folder):
-        print(f"Error: Videos folder does not exist: {videos_folder}")
+        logger.error(f"Videos folder does not exist: {videos_folder}")
         return False
         
     if not validate_directory_exists(points_folder):
-        print(f"Error: Points folder does not exist: {points_folder}")
+        logger.error(f"Points folder does not exist: {points_folder}")
         return False
         
     # Create preprocessed folder if it doesn't exist
@@ -64,7 +67,7 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
         try:
             os.makedirs(preprocessed_folder)
         except OSError as e:
-            print(f"Error creating preprocessed folder: {e}")
+            logger.error(f"Error creating preprocessed folder: {e}")
             return False
     
     # Get completed files to avoid reprocessing
@@ -97,12 +100,12 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
                 points.append(point_file)
                 valid_files.append(file_path)
             else:
-                print(f"Warning: Point file not found for {file_path}: {point_file}")
+                logger.warning(f"Point file not found for {file_path}: {point_file}")
         
         files_to_process = valid_files
         
         if not files_to_process:
-            print("No valid files to process")
+            logger.warning("No valid files to process")
             return True
             
         # Filter out already completed files
@@ -111,7 +114,7 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
         points = [p for p, m in zip(points, mask_done) if not m]
         
         if not files_to_process:
-            print("All files already processed")
+            logger.info("All files already processed")
             return True
         
         # Convert paths to Linux format for cluster
@@ -119,12 +122,12 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
         files_to_process_linux = list(map(convert_to_linux_path, files_to_process))
         points_linux = list(map(convert_to_linux_path, points))
         
-        print(f"Processing {len(files_to_process)} files")
+        logger.info(f"Processing {len(files_to_process)} files")
         return preprocessing_function(files_to_process_linux, points_linux, preprocessed_folder_linux)
         
     except OSError as e:
-        print(f"Error accessing directories: {e}")
+        logger.error(f"Error accessing directories: {e}")
         return False
     except Exception as e:
-        print(f"Error in cluster preprocessing: {e}")
+        logger.error(f"Error in cluster preprocessing: {e}")
         return False

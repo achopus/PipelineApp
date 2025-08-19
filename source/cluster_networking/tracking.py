@@ -2,12 +2,16 @@
 Video tracking functionality for cluster operations.
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Callable, List
 
 from cluster_networking.ssh_handling import slurm_text_tracking, ssh_send_command
 from cluster_networking.utils import convert_to_linux_path, validate_directory_exists, validate_file_exists
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 def tracking_function(project_folder: str, files_to_process: List[str], target_folder: str) -> bool:
@@ -26,7 +30,7 @@ def tracking_function(project_folder: str, files_to_process: List[str], target_f
         commands = slurm_text_tracking(files_to_process, target_folder)
         return ssh_send_command(commands)
     except Exception as e:
-        print(f"Error in tracking function: {e}")
+        logger.error(f"Error in tracking function: {e}")
         return False
 
 
@@ -42,7 +46,7 @@ def cluster_tracking(yaml_path: str, tracking_function_param: Callable = trackin
         bool: True if tracking was initiated successfully
     """
     if not validate_file_exists(yaml_path):
-        print(f"Error: YAML file does not exist: {yaml_path}")
+        logger.error(f"YAML file does not exist: {yaml_path}")
         return False
         
     project_folder = os.path.dirname(yaml_path)
@@ -51,8 +55,8 @@ def cluster_tracking(yaml_path: str, tracking_function_param: Callable = trackin
     
     # Validate required directories exist
     if not validate_directory_exists(preprocessed_folder):
-        print(f"Error: Preprocessed videos folder does not exist: {preprocessed_folder}")
-        print("Please run preprocessing first.")
+        logger.error(f"Preprocessed videos folder does not exist: {preprocessed_folder}")
+        logger.error("Please run preprocessing first")
         return False
     
     # Create tracking folder if it doesn't exist
@@ -60,7 +64,7 @@ def cluster_tracking(yaml_path: str, tracking_function_param: Callable = trackin
         try:
             os.makedirs(tracking_folder)
         except OSError as e:
-            print(f"Error creating tracking folder: {e}")
+            logger.error(f"Error creating tracking folder: {e}")
             return False
     
     # Get completed files to avoid reprocessing
@@ -88,7 +92,7 @@ def cluster_tracking(yaml_path: str, tracking_function_param: Callable = trackin
         ]
         
         if not files_to_process:
-            print("No preprocessed files found to track")
+            logger.warning("No preprocessed files found to track")
             return True
         
         # Filter out already completed files
@@ -96,7 +100,7 @@ def cluster_tracking(yaml_path: str, tracking_function_param: Callable = trackin
         files_to_process = [f for f, m in zip(files_to_process, mask_done) if not m]
         
         if not files_to_process:
-            print("All files already tracked")
+            logger.info("All files already tracked")
             return True
         
         # Convert paths to Linux format for cluster
@@ -104,12 +108,12 @@ def cluster_tracking(yaml_path: str, tracking_function_param: Callable = trackin
         tracking_folder_linux = convert_to_linux_path(tracking_folder)
         files_to_process_linux = list(map(convert_to_linux_path, files_to_process))
         
-        print(f"Tracking {len(files_to_process)} files")
+        logger.info(f"Tracking {len(files_to_process)} files")
         return tracking_function_param(project_folder_linux, files_to_process_linux, tracking_folder_linux)
         
     except OSError as e:
-        print(f"Error accessing directories: {e}")
+        logger.error(f"Error accessing directories: {e}")
         return False
     except Exception as e:
-        print(f"Error in cluster tracking: {e}")
+        logger.error(f"Error in cluster tracking: {e}")
         return False
