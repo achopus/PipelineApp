@@ -50,7 +50,7 @@ class VideoPointsWidget(QWidget):
 
         # Video display label
         self.video_label = QLabel("Video will display here")
-        self.video_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed) # type: ignore
+        self.video_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         left_layout.addWidget(self.video_label)
 
         # Buttons for video navigation
@@ -279,7 +279,7 @@ class VideoPointsWidget(QWidget):
         h_display = int(round(height * self.display_scale))
 
         # Set fixed size of label to displayed size
-        self.video_label.setFixedSize(w_display, h_display)
+        self.video_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Start timer (30 fps approx)
         self.timer.start(int(1000 / 30))
@@ -329,7 +329,7 @@ class VideoPointsWidget(QWidget):
         self.display_scale = scale
         
         # Set the video label size first
-        self.video_label.setFixedSize(display_w, display_h)
+        self.video_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Scale pixmap to calculated display size
         pixmap = pixmap.scaled(display_w, display_h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)

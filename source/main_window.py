@@ -228,7 +228,7 @@ class MainWindow(QMainWindow):
         if hasattr(self.project_management_tab, 'update_progress_table'):
             self.project_management_tab.update_progress_table()
         
-        self.metrics_dataframe = construct_metric_dataframe(self.metrics)
+        self.metrics_dataframe = construct_metric_dataframe(self.metrics, self.yaml_path)
         self.metrics_dataframe.to_csv(
             os.path.join(self.folder_path, "results", "metrics_dataframe.csv"), 
             index=False

@@ -251,7 +251,7 @@ class StatisticalAnalysisTab(QWidget):
         metrics_layout.addLayout(btn_layout)
         
         self.metrics_list = QListWidget()
-        self.metrics_list.setSelectionMode(QListWidget.MultiSelection)
+        # Use checkbox-based selection instead of multi-selection
         metrics_layout.addWidget(self.metrics_list)
         
         layout.addWidget(metrics_group)
@@ -437,16 +437,21 @@ class StatisticalAnalysisTab(QWidget):
             self.populate_metrics_list()
             self.populate_factor_combo()
             
+            # Debug information
+            print(f"Debug: Loaded {len(self.metrics_dataframe)} rows")
+            print(f"Debug: Columns: {list(self.metrics_dataframe.columns)}")
+            print(f"Debug: Grouping factors: {self.grouping_factors}")
+            
             self.analyze_btn.setEnabled(True)
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load data: {str(e)}")
     
     def extract_grouping_factors(self) -> None:
-        """Extract grouping factors from filenames using YAML structure."""
+        """Extract grouping factors from the dataframe columns."""
         self.grouping_factors = []
         
-        if not self.yaml_config or not self.metrics_dataframe is not None:
+        if not self.yaml_config or self.metrics_dataframe is None:
             return
         
         filename_structure = self.yaml_config.get('filename_structure', {})
@@ -455,21 +460,25 @@ class StatisticalAnalysisTab(QWidget):
         if not field_names:
             return
         
-        # Extract factors from filenames
-        sample_filename = self.metrics_dataframe['Filename'].iloc[0] if len(self.metrics_dataframe) > 0 else ""
+        # Check if the field columns exist in the dataframe (they should if construct_metric_dataframe worked)
+        existing_fields = [field for field in field_names if field in self.metrics_dataframe.columns]
         
-        # Remove extension and split
-        base_name = os.path.splitext(sample_filename)[0]
-        parts = base_name.split('_')
-        
-        if len(parts) == len(field_names):
-            self.grouping_factors = field_names
-            
-            # Add extracted factors as columns to dataframe
-            for i, factor_name in enumerate(field_names):
-                self.metrics_dataframe[factor_name] = self.metrics_dataframe['Filename'].apply(
-                    lambda x: os.path.splitext(x)[0].split('_')[i] if len(os.path.splitext(x)[0].split('_')) > i else ''
-                )
+        if existing_fields:
+            self.grouping_factors = existing_fields
+        else:
+            # Fallback: if for some reason the columns don't exist, try to extract from filename column
+            if 'Filename' in self.metrics_dataframe.columns:
+                sample_filename = self.metrics_dataframe['Filename'].iloc[0] if len(self.metrics_dataframe) > 0 else ""
+                base_name = os.path.splitext(sample_filename)[0]
+                parts = base_name.split('_')
+                
+                if len(parts) == len(field_names):
+                    self.grouping_factors = field_names
+                    # Add extracted factors as columns to dataframe
+                    for i, factor_name in enumerate(field_names):
+                        self.metrics_dataframe[factor_name] = self.metrics_dataframe['Filename'].apply(
+                            lambda x: os.path.splitext(x)[0].split('_')[i] if len(os.path.splitext(x)[0].split('_')) > i else ''
+                        )
     
     def update_data_status(self) -> None:
         """Update the data status label."""
@@ -483,25 +492,28 @@ class StatisticalAnalysisTab(QWidget):
     
     def populate_metrics_list(self) -> None:
         """Populate the metrics selection list."""
-        if not self.metrics_list or self.metrics_dataframe is None:
+        if self.metrics_list is None or self.metrics_dataframe is None:
             return
         
         self.metrics_list.clear()
         
-        # Get numeric columns (exclude filename and grouping factors)
-        exclude_cols = ['Filename'] + self.grouping_factors
+        # Get numeric columns (exclude any filename column and grouping factors)
+        exclude_cols = self.grouping_factors.copy()
+        if 'Filename' in self.metrics_dataframe.columns:
+            exclude_cols.append('Filename')
+        
         numeric_cols = [col for col in self.metrics_dataframe.columns 
                        if col not in exclude_cols and 
                        pd.api.types.is_numeric_dtype(self.metrics_dataframe[col])]
         
         for col in numeric_cols:
             item = QListWidgetItem(col)
-            item.setCheckState(Qt.CheckState.Unchecked)
+            item.setCheckState(Qt.CheckState(0))  # Qt.Unchecked
             self.metrics_list.addItem(item)
     
     def populate_factor_combo(self) -> None:
         """Populate the grouping factor combo box."""
-        if not self.factor_combo:
+        if self.factor_combo is None:
             return
         
         self.factor_combo.clear()
@@ -530,7 +542,7 @@ class StatisticalAnalysisTab(QWidget):
         for i in range(self.metrics_list.count()):
             item = self.metrics_list.item(i)
             if item:
-                item.setCheckState(Qt.CheckState.Checked)
+                item.setCheckState(Qt.CheckState(2))  # Qt.Checked
 
     def select_no_metrics(self) -> None:
         """Deselect all metrics in the list."""
@@ -540,7 +552,7 @@ class StatisticalAnalysisTab(QWidget):
         for i in range(self.metrics_list.count()):
             item = self.metrics_list.item(i)
             if item:
-                item.setCheckState(Qt.CheckState.Unchecked)
+                item.setCheckState(Qt.CheckState(0))  # Qt.Unchecked
 
     def get_selected_metrics(self) -> List[str]:
         """Get the list of selected metrics."""
@@ -550,7 +562,7 @@ class StatisticalAnalysisTab(QWidget):
         selected = []
         for i in range(self.metrics_list.count()):
             item = self.metrics_list.item(i)
-            if item and item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState(2):  # Qt.Checked
                 selected.append(item.text())
         
         return selected
@@ -784,7 +796,7 @@ class StatisticalAnalysisTab(QWidget):
                     item.setBackground(QColor(139, 0, 0))  # dark red
                     item.setForeground(QColor(255, 255, 255))  # white
                 
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable) # type: ignore
+                # Note: Item will be editable by default, but functionality should work
                 self.results_table.setItem(row_idx, col_idx, item)
         
         # Resize columns to content
@@ -844,5 +856,19 @@ class StatisticalAnalysisTab(QWidget):
         if self.parent_window and hasattr(self.parent_window, 'metrics_dataframe'):
             if self.parent_window.metrics_dataframe is not None:
                 self.metrics_dataframe = self.parent_window.metrics_dataframe
+                
+                # Also get the YAML config
+                if hasattr(self.parent_window, 'yaml_path') and self.parent_window.yaml_path:
+                    try:
+                        with open(self.parent_window.yaml_path, 'r') as f:
+                            self.yaml_config = yaml.safe_load(f)
+                    except Exception as e:
+                        print(f"Warning: Could not load YAML config: {e}")
+                
+                # Extract grouping factors
+                self.extract_grouping_factors()
+                
+                # Update UI
                 self.update_data_status()
                 self.populate_metrics_list()
+                self.populate_factor_combo()

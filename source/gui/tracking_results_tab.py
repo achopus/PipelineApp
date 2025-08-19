@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 from pandas import DataFrame
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap
@@ -23,6 +24,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QSizePolicy
 )
 
 from cluster_networking.tracking import cluster_tracking
@@ -161,7 +163,7 @@ class TrackingResultsTab(QWidget):
         self.metrics_progress_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.metrics_progress_text.setText("📊 Metrics can be calculated once the tracking is completed.")
         left_layout.addWidget(self.metrics_progress_text)
-        left_layout.addStretch(0)
+        left_layout.addStretch(1)
 
         # Compact image viewer
         image_viewer = QWidget()
@@ -199,7 +201,8 @@ class TrackingResultsTab(QWidget):
         
         image_label = QLabel()
         image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image_label.setMaximumSize(746, 600)
+        image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        image_label.setMinimumSize(300, 200)
         image_label.setStyleSheet("""
             QLabel {
                 background-color: #1a1a1a;
@@ -217,7 +220,7 @@ class TrackingResultsTab(QWidget):
             QLabel {
                 color: #e6f3f7;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                font-size: 14px;
+                font-size: 32px;
                 font-weight: 600;
                 padding: 8px;
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
@@ -241,7 +244,7 @@ class TrackingResultsTab(QWidget):
         
         def create_nav_button(text, icon):
             button = QPushButton(f"{icon} {text}")
-            button.setFixedSize(120, 45)
+            button.setFixedSize(160, 45)
             button.setStyleSheet("""
                 QPushButton {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
@@ -250,7 +253,7 @@ class TrackingResultsTab(QWidget):
                     border: 2px solid #5a8a9a;
                     border-radius: 8px;
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    font-size: 12px;
+                    font-size: 24px;
                     font-weight: 600;
                     padding: 8px 16px;
                 }
@@ -297,7 +300,9 @@ class TrackingResultsTab(QWidget):
         self.metrics_table = QTableWidget()
         self.metrics_table.setColumnCount(1)
         self.metrics_table.setHorizontalHeaderLabels(["Metrics will be shown here once the computation is done."])
-        self.metrics_table.setColumnWidth(0, 600)
+        vertical_header = self.metrics_table.verticalHeader()
+        if vertical_header is not None:
+            vertical_header.setVisible(False)
         right_layout.addWidget(metrics_label)
         right_layout.addWidget(self.metrics_table)
 
@@ -374,10 +379,14 @@ class TrackingResultsTab(QWidget):
             
             for i, column in enumerate(metrics_dataframe.columns):
                 for j, value in enumerate(metrics_dataframe[column]):
-                    if column != 'Filename':
-                        value = round(value, 2)
+                    # Only round numeric values
+                    if pd.api.types.is_numeric_dtype(metrics_dataframe[column]) and pd.notna(value):
+                        try:
+                            value = round(float(value), 2)
+                        except (ValueError, TypeError):
+                            pass  # Keep original value if rounding fails
                     item = QTableWidgetItem(str(value))
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # type: ignore
+                    # Note: Item will be editable by default, but functionality should work
                     self.metrics_table.setItem(j, i, item)
 
     def check_preprocessing_status(self, yaml_path: str) -> None:
