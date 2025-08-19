@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QWidget
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 
 # Local application imports
 from file_management.status import Status
@@ -52,6 +52,9 @@ class MainWindow(QMainWindow):
         # Initialize scaling manager first
         self.scaling_manager = get_scaling_manager()
         self.setWindowTitle("Video tracking")
+        
+        # Set window icon with proper path resolution
+        self._set_window_icon()
 
         # Initialize data attributes
         self.folder_path: Optional[str] = None
@@ -98,6 +101,36 @@ class MainWindow(QMainWindow):
         
         # Start maximized
         self.showFullScreen()
+
+    def _set_window_icon(self):
+        """Set the window icon with proper error handling."""
+        try:
+            # Try multiple possible icon locations
+            possible_paths = [
+                # Resources folder next to main_window.py
+                os.path.join(os.path.dirname(__file__), "resources", "rat_icon.ico"),
+                # Resources folder at project root
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "rat_icon.ico"),
+                # Assets folder at project root
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "rat_icon.ico"),
+                # Direct in source folder
+                os.path.join(os.path.dirname(__file__), "rat_icon.ico")
+            ]
+            
+            icon_set = False
+            for icon_path in possible_paths:
+                self.logger.info(f"Trying icon path: {icon_path}")
+                if os.path.exists(icon_path):
+                    self.setWindowIcon(QIcon(icon_path))
+                    self.logger.info(f"Successfully set window icon from: {icon_path}")
+                    icon_set = True
+                    break
+            
+            if not icon_set:
+                self.logger.warning("Could not find rat_icon.ico in any expected location")
+                
+        except Exception as e:
+            self.logger.error(f"Error setting window icon: {e}")
 
     def create_exit_button(self) -> None:
         """Create an exit button in the top right corner."""
