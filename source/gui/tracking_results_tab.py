@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -45,12 +46,24 @@ class TrackingResultsTab(QWidget):
         
     def setup_ui(self) -> None:
         """Set up the user interface for the tracking and results tab."""
-        main_layout = QHBoxLayout()  # Main horizontal layout to split left/right sides
+        # Create main horizontal layout with scroll areas
+        main_layout = QHBoxLayout()
         
-        # Left side layout - more compact
-        left_layout = QVBoxLayout()
+        # Create scroll areas for left and right sides
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setMinimumWidth(300)  # Ensure minimum width
+        
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setMinimumWidth(400)  # Ensure minimum width
+        
+        # Left side widget and layout - more compact
+        left_widget = QWidget()
+        left_widget.setMinimumHeight(800)  # Ensure scrollable content
+        left_layout = QVBoxLayout(left_widget)
         left_layout.setSpacing(10)
-        left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        # Remove alignment setting for PyQt5 compatibility
         
         # Compact button layout with improved styling
         btn_layout = QHBoxLayout()
@@ -277,7 +290,9 @@ class TrackingResultsTab(QWidget):
         left_layout.addStretch(1)
 
         # Right side - Metrics table
-        right_layout = QVBoxLayout()
+        right_widget = QWidget()
+        right_widget.setMinimumHeight(600)  # Ensure scrollable content
+        right_layout = QVBoxLayout(right_widget)
         metrics_label = QLabel("Calculated Metrics:")
         self.metrics_table = QTableWidget()
         self.metrics_table.setColumnCount(1)
@@ -286,9 +301,13 @@ class TrackingResultsTab(QWidget):
         right_layout.addWidget(metrics_label)
         right_layout.addWidget(self.metrics_table)
 
-        # Combine layouts with more space for right side
-        main_layout.addLayout(left_layout, stretch=0)
-        main_layout.addLayout(right_layout, stretch=1)
+        # Set widgets for scroll areas
+        left_scroll.setWidget(left_widget)
+        right_scroll.setWidget(right_widget)
+
+        # Combine scroll areas with more space for right side
+        main_layout.addWidget(left_scroll, stretch=0)
+        main_layout.addWidget(right_scroll, stretch=1)
         
         self.setLayout(main_layout)
 

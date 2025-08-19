@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -31,8 +32,15 @@ class VideoPointsAnnotationTab(QWidget):
         
     def setup_ui(self) -> None:
         """Set up the user interface for the video points annotation tab."""
-        # Layout & buttons for tab 2
-        layout = QVBoxLayout()
+        # Create main scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setMinimumHeight(400)  # Ensure minimum height
+        
+        # Create main widget for the scroll area
+        main_widget = QWidget()
+        main_widget.setMinimumHeight(800)  # Ensure scrollable content
+        layout = QVBoxLayout(main_widget)
         
         btn_layout = QHBoxLayout()
 
@@ -74,7 +82,13 @@ class VideoPointsAnnotationTab(QWidget):
         self.video_points_container = QWidget()
         layout.addWidget(self.video_points_container)
 
-        self.setLayout(layout)
+        # Set the main widget in the scroll area
+        scroll_area.setWidget(main_widget)
+        
+        # Set up the main layout for this tab
+        tab_layout = QVBoxLayout()
+        tab_layout.addWidget(scroll_area)
+        self.setLayout(tab_layout)
 
         def open_video_annotation():
             """Open the video annotation widget."""

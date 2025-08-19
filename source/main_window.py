@@ -28,6 +28,7 @@ from PyQt5.QtGui import QFont
 from file_management.status import Status
 from gui.project_management_tab import ProjectManagementTab
 from gui.scaling import get_scaling_manager
+from gui.statistical_analysis_tab import StatisticalAnalysisTab
 from gui.style import get_scaled_dark_style
 from gui.tracking_results_tab import TrackingResultsTab
 from gui.video_points_annotation_tab import VideoPointsAnnotationTab
@@ -62,11 +63,13 @@ class MainWindow(QMainWindow):
         self.project_management_tab = ProjectManagementTab(self)
         self.video_points_tab = VideoPointsAnnotationTab(self)
         self.tracking_results_tab = TrackingResultsTab(self)
+        self.statistical_analysis_tab = StatisticalAnalysisTab(self)
 
         # Add tabs to the tab widget
         self.tabs.addTab(self.project_management_tab, "1. Project Management")
         self.tabs.addTab(self.video_points_tab, "2. Video Points Annotation")
         self.tabs.addTab(self.tracking_results_tab, "3. Animal tracking + Results")
+        self.tabs.addTab(self.statistical_analysis_tab, "4. Statistical Analysis")
         # Set tab bar style for wider tabs
         self.tabs.setStyleSheet("""
             QTabBar::tab {
@@ -79,9 +82,10 @@ class MainWindow(QMainWindow):
         # Create exit button in top right
         self.create_exit_button()
 
-        # Initially disable tabs 2 and 3
+        # Initially disable tabs 2, 3, and 4
         self.tabs.setTabEnabled(1, False)
         self.tabs.setTabEnabled(2, False)
+        self.tabs.setTabEnabled(3, False)
 
         self.setCentralWidget(self.tabs)
         
@@ -159,6 +163,13 @@ class MainWindow(QMainWindow):
         self.tracking_results_tab.setup_ui()
         self.tabs.setTabEnabled(2, True)
 
+    def enable_statistical_analysis_tab(self) -> None:
+        """Enable and set up the statistical analysis tab."""
+        self.tabs.setTabEnabled(3, True)
+        # Refresh data in the statistical analysis tab if it has metrics
+        if hasattr(self.statistical_analysis_tab, 'refresh_data'):
+            self.statistical_analysis_tab.refresh_data()
+
     def update_metrics_progress(self, i: int, n: int, video_name: str) -> None:
         """Update the metrics progress display."""
         self.tracking_results_tab.update_metrics_progress(i, n, video_name)
@@ -227,6 +238,9 @@ class MainWindow(QMainWindow):
             index=False
         )
         self.update_metrics_table()
+        
+        # Enable statistical analysis tab now that we have metrics data
+        self.enable_statistical_analysis_tab()
 
     def update_metrics_table(self) -> None:
         """Update the metrics table with current data."""

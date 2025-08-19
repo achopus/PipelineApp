@@ -22,6 +22,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpacerItem,
     QTableWidget,
@@ -55,10 +56,23 @@ class ProjectManagementTab(QWidget):
         
     def setup_ui(self) -> None:
         """Set up the user interface for the project management tab."""
-        main_layout = QHBoxLayout()  # Horizontal: left (buttons+yaml) | right (table)
+        # Create main horizontal layout with scroll areas
+        main_layout = QHBoxLayout()
+        
+        # Create scroll area for left side
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setMinimumWidth(400)  # Ensure minimum width
+        
+        # Create scroll area for right side  
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setMinimumWidth(500)  # Ensure minimum width
 
         # ----- LEFT SIDE -----
-        left_layout = QVBoxLayout()
+        left_widget = QWidget()
+        left_widget.setMinimumHeight(600)  # Ensure scrollable content
+        left_layout = QVBoxLayout(left_widget)
 
         # Buttons with improved styling
         button_layout = QHBoxLayout()
@@ -283,7 +297,9 @@ class ProjectManagementTab(QWidget):
         left_layout.addStretch()
 
         # ----- RIGHT SIDE -----
-        right_layout = QVBoxLayout()
+        right_widget = QWidget()
+        right_widget.setMinimumHeight(600)  # Ensure scrollable content
+        right_layout = QVBoxLayout(right_widget)
         progress_label = QLabel("📊 File Progress & Status")
         progress_label.setFont(QFont("Segoe UI", self.scaling_manager.scale_font_size(16), QFont.Bold))
         progress_label.setStyleSheet("color: #4dd0e1; margin-bottom: 15px;")
@@ -317,9 +333,13 @@ class ProjectManagementTab(QWidget):
 
         right_layout.addWidget(self.table)
 
-        # Add both columns to main layout
-        main_layout.addLayout(left_layout)
-        main_layout.addLayout(right_layout)
+        # Set widgets for scroll areas
+        left_scroll.setWidget(left_widget)
+        right_scroll.setWidget(right_widget)
+
+        # Add both scroll areas to main layout
+        main_layout.addWidget(left_scroll)
+        main_layout.addWidget(right_scroll)
 
         self.setLayout(main_layout)
 
@@ -363,6 +383,8 @@ class ProjectManagementTab(QWidget):
             self.metrics_dataframe = pd.read_csv(metrics_dataframe_path)
             if self.parent_window:
                 self.parent_window.metrics_dataframe = self.metrics_dataframe
+                # Enable statistical analysis tab since we have metrics data
+                self.parent_window.enable_statistical_analysis_tab()
 
         self.project_name.setText(str(data.get("project_name", "")))
         self.author_name.setText(str(data.get("author", "")))
