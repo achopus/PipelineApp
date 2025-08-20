@@ -25,9 +25,49 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QListWidgetItem
 )
-from PyQt5.QtCore import Qt, Qt as QtCore
+from PyQt5.QtCore import Qt, Qt as QtCore, QThread, pyqtSignal
 
 from gui.style import PROJECT_FOLDER
+
+
+class FileCopyWorker(QThread):
+    """Worker thread for copying files during project creation."""
+    
+    progress_update = pyqtSignal(int, int, str)  # current, total, filename
+    copy_complete = pyqtSignal()
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, source_folder: str, dest_folder: str, files_to_copy: list[str]):
+        super().__init__()
+        self.source_folder = source_folder
+        self.dest_folder = dest_folder
+        self.files_to_copy = files_to_copy
+        self.should_cancel = False
+    
+    def cancel(self):
+        """Cancel the file copying operation."""
+        self.should_cancel = True
+    
+    def run(self):
+        """Run the file copying process."""
+        try:
+            for i, video_file in enumerate(self.files_to_copy):
+                if self.should_cancel:
+                    return
+                
+                # Emit progress update
+                self.progress_update.emit(i, len(self.files_to_copy), video_file)
+                
+                # Copy the file
+                source_path = os.path.join(self.source_folder, video_file)
+                dest_path = os.path.join(self.dest_folder, video_file)
+                shutil_copy(source_path, dest_path)
+            
+            # Emit completion signal
+            self.copy_complete.emit()
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Error copying files: {str(e)}")
 
 
 class MergeGroupDialog(QDialog):
@@ -603,35 +643,19 @@ def create_project_folder(dialog: CreateProjectDialog) -> str:
                         f"{'...' if len(invalid_files) > 3 else ''}")
     
     if valid_files:
-        # Create progress dialog
-        progress_dialog = QProgressDialog(
-            "Copying video files to project folder...", 
-            "Cancel", 
-            0, 
-            len(valid_files),
+        # Use threaded file copying
+        success = _copy_files_threaded(
+            dialog.folder_field.text(),
+            os.path.join(project_path, 'videos'),
+            valid_files,
             dialog
         )
-        progress_dialog.setWindowTitle("Creating Project")
-        progress_dialog.setMinimumDuration(0)  # Show immediately
-        progress_dialog.show()
         
-        for i, video in enumerate(valid_files):
-            if progress_dialog.wasCanceled():
-                # Clean up partially created project if cancelled
-                import shutil
-                shutil.rmtree(project_path)
-                raise RuntimeError("Project creation was cancelled by user")
-                
-            progress_dialog.setLabelText(f"Copying: {video}")
-            progress_dialog.setValue(i)
-            QApplication.processEvents()  # Keep UI responsive
-            
-            source_path = os.path.join(dialog.folder_field.text(), video)
-            dest_path = os.path.join(project_path, 'videos', video)
-            shutil_copy(source_path, dest_path)
-        
-        progress_dialog.setValue(len(valid_files))  # Complete
-        progress_dialog.close()
+        if not success:
+            # Clean up partially created project if cancelled or failed
+            import shutil
+            shutil.rmtree(project_path)
+            raise RuntimeError("Project creation was cancelled or failed")
     
     # Create YAML configuration with filename structure info
     yaml_dict = {
@@ -654,3 +678,79 @@ def create_project_folder(dialog: CreateProjectDialog) -> str:
         yaml.dump(yaml_dict, f, default_flow_style=False, allow_unicode=True)
     
     return yaml_path
+
+
+def _copy_files_threaded(source_folder: str, dest_folder: str, files_to_copy: list[str], parent_dialog) -> bool:
+    """
+    Copy files using a background thread with progress dialog.
+    
+    Args:
+        source_folder: Source directory path
+        dest_folder: Destination directory path  
+        files_to_copy: List of filenames to copy
+        parent_dialog: Parent dialog for progress display
+        
+    Returns:
+        bool: True if successful, False if cancelled or failed
+    """
+    # Create progress dialog
+    progress_dialog = QProgressDialog(
+        "Copying video files to project folder...", 
+        "Cancel", 
+        0, 
+        len(files_to_copy),
+        parent_dialog
+    )
+    progress_dialog.setWindowTitle("Creating Project")
+    progress_dialog.setMinimumDuration(0)  # Show immediately
+    progress_dialog.setModal(True)
+    
+    # Create and configure the worker thread
+    copy_worker = FileCopyWorker(source_folder, dest_folder, files_to_copy)
+    
+    # Track completion status
+    copy_success = [False]  # Use list to allow modification in nested functions
+    copy_error = [None]  # type: list[Optional[str]]
+    
+    def on_progress_update(current: int, total: int, filename: str):
+        """Handle progress updates from the worker thread."""
+        progress_dialog.setLabelText(f"Copying: {filename}")
+        progress_dialog.setValue(current)
+        
+        # Check if user cancelled
+        if progress_dialog.wasCanceled():
+            copy_worker.cancel()
+    
+    def on_copy_complete():
+        """Handle successful completion of file copying."""
+        copy_success[0] = True
+        progress_dialog.setValue(len(files_to_copy))  # Complete
+        progress_dialog.accept()  # Close dialog
+    
+    def on_copy_error(error_message: str):
+        """Handle errors during file copying."""
+        copy_error[0] = error_message
+        progress_dialog.reject()  # Close dialog
+    
+    # Connect worker signals
+    copy_worker.progress_update.connect(on_progress_update)
+    copy_worker.copy_complete.connect(on_copy_complete)
+    copy_worker.error_occurred.connect(on_copy_error)
+    
+    # Start the worker and show progress dialog
+    copy_worker.start()
+    result = progress_dialog.exec_()  # This blocks until dialog is closed
+    
+    # Wait for worker to finish
+    copy_worker.wait()
+    
+    # Handle results
+    if copy_error[0]:
+        QMessageBox.critical(parent_dialog, "Copy Error", 
+                           f"An error occurred while copying files:\n\n{copy_error[0]}")
+        return False
+    elif result == QDialog.Rejected and not copy_success[0]:
+        # User cancelled
+        return False
+    else:
+        return copy_success[0]

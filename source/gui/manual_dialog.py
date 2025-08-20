@@ -2,7 +2,6 @@
 Manual dialog for displaying README and documentation content within the application.
 """
 
-import os
 import re
 from typing import Optional
 
@@ -14,9 +13,6 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFont, QPixmap, QTextDocument
 
 # Import embedded documentation content
-import sys
-import os
-#sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from documentation.readme_content import README_CONTENT
 from documentation.statistical_analysis_manual import STATISTICAL_ANALYSIS_MANUAL_CONTENT
 from documentation.field_merging_guide import FIELD_MERGING_GUIDE_CONTENT
@@ -172,12 +168,12 @@ class ManualDialog(QDialog):
         styled_html = f'''
         <div style="
             font-family: 'Segoe UI', 'Consolas', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.7;
+            line-height: 1;
             color: #d4d4d4;
             background-color: #1e1e1e;
             max-width: 100%;
             margin: 0 auto;
-            padding: 24px;
+            padding: 5x;
         ">
             {html}
         </div>

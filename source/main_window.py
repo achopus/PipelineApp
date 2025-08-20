@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QTabWidget,
     QMenu,
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon
 
 # Local application imports
@@ -36,6 +36,46 @@ from metric_calculation.metrics_pipeline import run_metrics_pipeline
 from metric_calculation.utils import construct_metric_dataframe
 from utils.logging_config import init_logging, get_logger
 from utils.settings_manager import reload_settings, set_project_path
+
+
+class MetricCalculationWorker(QThread):
+    """Worker thread for running metric calculations."""
+    
+    progress_update = pyqtSignal(int, int, str)  # current, total, video_name
+    calculation_complete = pyqtSignal(dict, dict)  # metrics, status
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, folder_path: str, pairs: list, metrics: dict, status: Optional[Dict[str, Status]]):
+        super().__init__()
+        self.folder_path = folder_path
+        self.pairs = pairs
+        self.metrics = metrics
+        self.status = status or {}
+    
+    def run(self):
+        """Run the metric calculations."""
+        try:
+            for i, (video_path, frame_path) in enumerate(self.pairs):
+                # Emit progress update
+                self.progress_update.emit(i, len(self.pairs), video_path)
+                
+                # Run metrics pipeline for this video
+                metrics = run_metrics_pipeline(
+                    frame_path=os.path.join(self.folder_path, "tracking", frame_path),
+                    source_video_path=os.path.join(self.folder_path, "videos", video_path),
+                    save_path=os.path.join(self.folder_path, "images", f"{Path(video_path).stem}.png")
+                )
+                
+                # Store results
+                self.metrics[Path(video_path).name] = metrics
+                if self.status is not None:
+                    self.status[Path(video_path).name] = Status.RESULTS_DONE
+            
+            # Emit completion signal with updated metrics and status
+            self.calculation_complete.emit(self.metrics, self.status)
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Error during metric calculation: {str(e)}")
 
 
 class MainWindow(QMainWindow):
@@ -63,6 +103,7 @@ class MainWindow(QMainWindow):
         self.metrics: Dict[str, Dict[str, float]] = {}
         self.metrics_dataframe: Optional[DataFrame] = None
         self.video_widget = None
+        self.metric_worker: Optional[MetricCalculationWorker] = None
 
         # Set up the tab widget
         self.tabs = QTabWidget()
@@ -320,7 +361,7 @@ class MainWindow(QMainWindow):
         self.tracking_results_tab.update_metrics_progress(i, n, video_name)
 
     def metrics_pipeline_wrapper(self) -> None:
-        """Wrapper for the metrics pipeline processing."""
+        """Wrapper for the metrics pipeline processing using threading."""
         if self.folder_path is None:
             return
             
@@ -355,17 +396,26 @@ class MainWindow(QMainWindow):
             no_data_dialog.exec_()
             return
 
-        for i, (video_path, frame_path) in enumerate(pairs):
-            metrics = run_metrics_pipeline(
-                frame_path=os.path.join(self.folder_path, "tracking", frame_path),
-                source_video_path=os.path.join(self.folder_path, "videos", video_path),
-                save_path=os.path.join(self.folder_path, "images", f"{Path(video_path).stem}.png")
-            )
-            self.metrics[Path(video_path).name] = metrics
-            if self.status is not None:
-                self.status[Path(video_path).name] = Status.RESULTS_DONE
-            self.update_metrics_progress(i, n_pairs, video_path)
+        # Start the threaded metric calculation
+        self.metric_worker = MetricCalculationWorker(
+            self.folder_path, pairs, self.metrics, self.status
+        )
         
+        # Connect signals
+        self.metric_worker.progress_update.connect(self.update_metrics_progress)
+        self.metric_worker.calculation_complete.connect(self.on_metrics_calculation_complete)
+        self.metric_worker.error_occurred.connect(self.on_metrics_calculation_error)
+        
+        # Start the worker thread
+        self.metric_worker.start()
+
+    def on_metrics_calculation_complete(self, metrics: dict, status: dict) -> None:
+        """Handle completion of metric calculations."""
+        # Update instance variables
+        self.metrics = metrics
+        self.status = status
+        
+        # Update UI
         if self.tracking_results_tab.metrics_progress_text:
             self.tracking_results_tab.metrics_progress_text.setText("Metrics calculation completed.")
         QApplication.processEvents()
@@ -373,19 +423,36 @@ class MainWindow(QMainWindow):
         if hasattr(self.project_management_tab, 'update_progress_table'):
             self.project_management_tab.update_progress_table()
         
-        self.metrics_dataframe = construct_metric_dataframe(self.metrics, self.yaml_path)
-        self.metrics_dataframe.to_csv(
-            os.path.join(self.folder_path, "results", "metrics_dataframe.csv"), 
-            index=False
-        )
-        self.metrics_dataframe.to_excel(
-            os.path.join(self.folder_path, "results", "metrics_dataframe.xlsx"), 
-            index=False
-        )
-        self.update_metrics_table()
+        # Generate dataframes and save results only if folder_path is valid
+        if self.folder_path is not None:
+            self.metrics_dataframe = construct_metric_dataframe(self.metrics, self.yaml_path)
+            self.metrics_dataframe.to_csv(
+                os.path.join(self.folder_path, "results", "metrics_dataframe.csv"), 
+                index=False
+            )
+            self.metrics_dataframe.to_excel(
+                os.path.join(self.folder_path, "results", "metrics_dataframe.xlsx"), 
+                index=False
+            )
+            self.update_metrics_table()
+            
+            # Enable statistical analysis tab now that we have metrics data
+            self.enable_statistical_analysis_tab()
         
-        # Enable statistical analysis tab now that we have metrics data
-        self.enable_statistical_analysis_tab()
+        # Clean up the worker
+        self.metric_worker = None
+
+    def on_metrics_calculation_error(self, error_message: str) -> None:
+        """Handle errors during metric calculations."""
+        QMessageBox.critical(self, "Metric Calculation Error", 
+                           f"An error occurred during metric calculation:\n\n{error_message}")
+        
+        # Reset progress display
+        if self.tracking_results_tab.metrics_progress_text:
+            self.tracking_results_tab.metrics_progress_text.setText("Metric calculation failed.")
+        
+        # Clean up the worker
+        self.metric_worker = None
 
     def update_metrics_table(self) -> None:
         """Update the metrics table with current data."""
