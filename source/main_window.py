@@ -33,7 +33,7 @@ from gui.video_points_annotation_tab import VideoPointsAnnotationTab
 from metric_calculation.metrics_pipeline import run_metrics_pipeline
 from metric_calculation.utils import construct_metric_dataframe
 from utils.logging_config import init_logging, get_logger
-from utils.settings_manager import reload_settings
+from utils.settings_manager import reload_settings, set_project_path
 
 
 class MainWindow(QMainWindow):
@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
 
         # Initialize data attributes
         self.folder_path: Optional[str] = None
-        self.yaml_path: Optional[str] = None
+        self._yaml_path: Optional[str] = None
         self.status: Optional[Dict[str, Status]] = None
         self.metrics: Dict[str, Dict[str, float]] = {}
         self.metrics_dataframe: Optional[DataFrame] = None
@@ -99,6 +99,18 @@ class MainWindow(QMainWindow):
         
         # Start maximized
         self.showFullScreen()
+    
+    @property
+    def yaml_path(self) -> Optional[str]:
+        """Get the current project YAML path."""
+        return self._yaml_path
+    
+    @yaml_path.setter
+    def yaml_path(self, value: Optional[str]) -> None:
+        """Set the current project YAML path and update settings manager."""
+        self._yaml_path = value
+        # Update the settings manager with the new project path
+        set_project_path(value)
 
     def _set_window_icon(self):
         """Set the window icon with proper error handling."""
@@ -175,20 +187,14 @@ class MainWindow(QMainWindow):
             QMenuBar::item:pressed {
                 background-color: #26a69a;
             }
-            QMenuBar::item:first-child:selected {
-                background-color: #ff4444;
-            }
-            QMenuBar::item:first-child:pressed {
-                background-color: #cc3333;
-            }
         """)
 
     def open_settings(self) -> None:
         """Open the settings dialog."""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self.yaml_path, self)
         if dialog.exec_() == QDialog.Accepted:
             # Settings were saved, reload them in the settings manager
-            reload_settings()
+            reload_settings(self.yaml_path)
             self.logger.info("Pipeline settings updated")
     
     def create_exit_button(self) -> None:

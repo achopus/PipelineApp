@@ -14,6 +14,7 @@ class SettingsManager:
     
     _instance: Optional['SettingsManager'] = None
     _settings: Dict[str, Any] = {}
+    _current_project_path: Optional[str] = None
     
     def __new__(cls) -> 'SettingsManager':
         if cls._instance is None:
@@ -62,8 +63,11 @@ class SettingsManager:
             "cluster_padding_factor": 0.2  # Was cluster_size // 5, now 20% of cluster size
         }
     
-    def _load_settings(self) -> None:
+    def _load_settings(self, project_path: Optional[str] = None) -> None:
         """Load settings from file."""
+        if project_path:
+            self._current_project_path = project_path
+        
         settings_path = self._get_settings_path()
         if os.path.exists(settings_path):
             try:
@@ -80,9 +84,15 @@ class SettingsManager:
     
     def _get_settings_path(self) -> str:
         """Get the path to the settings file."""
-        if not os.path.exists(PROJECT_FOLDER):
-            os.makedirs(PROJECT_FOLDER)
-        return os.path.join(PROJECT_FOLDER, "pipeline_settings.json")
+        if self._current_project_path and os.path.exists(self._current_project_path):
+            # Use project-specific settings
+            project_folder = os.path.dirname(self._current_project_path)
+            return os.path.join(project_folder, "pipeline_settings.json")
+        else:
+            # Fall back to global settings in PROJECT_FOLDER
+            if not os.path.exists(PROJECT_FOLDER):
+                os.makedirs(PROJECT_FOLDER)
+            return os.path.join(PROJECT_FOLDER, "pipeline_settings.json")
     
     def get_setting(self, key: str, default: Any = None) -> Any:
         """Get a specific setting value."""
@@ -92,9 +102,25 @@ class SettingsManager:
         """Get all settings."""
         return self._settings.copy()
     
-    def reload_settings(self) -> None:
+    def reload_settings(self, project_path: Optional[str] = None) -> None:
         """Reload settings from file."""
+        self._load_settings(project_path)
+    
+    def set_project_path(self, project_path: Optional[str]) -> None:
+        """Set the current project path and reload settings."""
+        self._current_project_path = project_path
         self._load_settings()
+    
+    def save_settings(self, settings: Dict[str, Any]) -> None:
+        """Save settings to file."""
+        self._settings = settings
+        settings_path = self._get_settings_path()
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+        
+        with open(settings_path, 'w') as f:
+            json.dump(self._settings, f, indent=2)
 
 
 # Global instance
@@ -114,6 +140,11 @@ def get_setting(key: str, default: Any = None) -> Any:
     return get_settings_manager().get_setting(key, default)
 
 
-def reload_settings() -> None:
+def reload_settings(project_path: Optional[str] = None) -> None:
     """Reload settings from file."""
-    get_settings_manager().reload_settings()
+    get_settings_manager().reload_settings(project_path)
+
+
+def set_project_path(project_path: Optional[str]) -> None:
+    """Set the current project path for settings."""
+    get_settings_manager().set_project_path(project_path)

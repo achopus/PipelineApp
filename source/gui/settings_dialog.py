@@ -22,11 +22,17 @@ from utils.settings_manager import get_settings_manager
 class SettingsDialog(QDialog):
     """Dialog for configuring metric calculation settings."""
     
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, project_path: Optional[str] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle("Pipeline Settings")
         self.setModal(True)
         self.resize(800, 700)
+        
+        self.project_path = project_path
+        
+        # Set the project path in settings manager if provided
+        if self.project_path:
+            get_settings_manager().set_project_path(self.project_path)
         
         # Default settings
         self.default_settings = self.get_default_settings()
@@ -472,45 +478,21 @@ class SettingsDialog(QDialog):
         self.current_settings = self.get_current_settings()
         
         try:
-            self.save_settings_to_file()
-            # Reload settings in the global manager
-            get_settings_manager().reload_settings()
+            # Use settings manager to save
+            get_settings_manager().save_settings(self.current_settings)
             QMessageBox.information(self, "Settings Saved", "Settings have been saved successfully.")
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Save Error", f"Failed to save settings: {str(e)}")
     
-    def get_settings_path(self) -> str:
-        """Get the path to the settings file."""
-        if not os.path.exists(PROJECT_FOLDER):
-            os.makedirs(PROJECT_FOLDER)
-        return os.path.join(PROJECT_FOLDER, "pipeline_settings.json")
-    
     def load_settings(self) -> Dict[str, Any]:
-        """Load settings from file."""
-        settings_path = self.get_settings_path()
-        if os.path.exists(settings_path):
-            try:
-                with open(settings_path, 'r') as f:
-                    loaded_settings = json.load(f)
-                
-                # Merge with defaults to ensure all keys exist
-                settings = self.get_default_settings()
-                settings.update(loaded_settings)
-                return settings
-            except Exception:
-                return self.get_default_settings()
-        else:
-            return self.get_default_settings()
-    
-    def save_settings_to_file(self) -> None:
-        """Save settings to file."""
-        settings_path = self.get_settings_path()
-        with open(settings_path, 'w') as f:
-            json.dump(self.current_settings, f, indent=2)
+        """Load settings from the settings manager."""
+        return get_settings_manager().get_all_settings()
 
 
-def get_pipeline_settings() -> Dict[str, Any]:
+def get_pipeline_settings(project_path: Optional[str] = None) -> Dict[str, Any]:
     """Get the current pipeline settings."""
-    dialog = SettingsDialog()
-    return dialog.current_settings
+    settings_manager = get_settings_manager()
+    if project_path:
+        settings_manager.set_project_path(project_path)
+    return settings_manager.get_all_settings()
