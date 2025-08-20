@@ -1,44 +1,28 @@
 # PipelineApp - Video Tracking Pipeline
 
-A comprehensive PyQt5-based GUI application for automated behavioral analysis of animal experiments, specifically designed for Open Field Test (OFT) and Elevated Plus Maze (EPM) paradigms. The application provides an end-to-end pipeline from t.
-video annotation to metrics calculation with cluster computing suppor
-## 🎯 Features
+A comprehensive PyQt5-based GUI application for automated behavioral analysis of animal experiments, designed for Open Field Test (OFT) and Elevated Plus Maze (EPM) paradigms. This application provides an end-to-end pipeline from video annotation to comprehensive behavioral metrics analysis with integrated statistical testing capabilities.
 
-### **Project Management**
-- Create and manage behavioral experiment projects
-- Configurable filename structure validation for organized data
-- Project configuration stored in YAML format
-- Support for multiple experiment types (OFT, EPM)
+## 🎯 Key Features
 
-### **Video Processing Pipeline**
-1. **Video Points Annotation** - Mark arena corners and reference points
-2. **Cluster Preprocessing** - Submit video preprocessing jobs to SLURM cluster
-3. **Animal Tracking** - Deep learning-based pose estimation and tracking
-4. **Metrics Calculation** - Comprehensive behavioral metrics analysis
+### **Complete Analysis Pipeline**
+- **Project Management**: Create and organize behavioral experiment projects with configurable filename structures
+- **Video Points Annotation**: Mark arena corners with visual feedback for spatial calibration
+- **Cluster Processing**: Submit videos for preprocessing and tracking analysis via SLURM cluster
+- **Metrics Calculation**: Generate comprehensive behavioral measurements with temporal binning
+- **Statistical Analysis**: Built-in statistical testing with t-tests, one-way ANOVA, and two-way ANOVA
 
 ### **Advanced Analytics**
-- **Trajectory Analysis**: Position tracking and movement patterns
-- **Behavioral Metrics**: Distance traveled, velocity, thigmotaxis, center exploration
-- **Time-binned Analysis**: Configurable time windows for temporal analysis
-- **Statistical Analysis**: Comprehensive statistical testing with t-tests, ANOVA, and two-way ANOVA
-- **Visualization**: Publication-ready trajectory plots with heatmaps
-
-### **Cluster Integration**
-- SSH-based communication with SLURM clusters
-- Automated job submission and monitoring
-- Robust error handling and retry mechanisms
-- Environment variable configuration for different clusters
+- **Movement Analysis**: Velocity calculation, distance tracking, and activity patterns
+- **Spatial Behavior**: Thigmotaxis, center exploration, and wall proximity analysis
+- **Temporal Patterns**: Configurable time-binned analysis (default: 5-minute windows)
+- **Statistical Testing**: Comprehensive statistical analysis with effect sizes and post-hoc tests
+- **Visualization**: Trajectory plots with publication-ready image exports
 
 ## 🚀 Installation
 
 ### Prerequisites
 - Python 3.11+
-- PyQt5
-- OpenCV
-- NumPy, Pandas, SciPy
-- Matplotlib
-- Statsmodels (for two-way ANOVA)
-- SSH access to a SLURM cluster (for processing)
+- SSH access to a SLURM cluster (for video processing)
 
 ### Setup
 1. **Clone the repository**
@@ -49,7 +33,7 @@ video annotation to metrics calculation with cluster computing suppor
 
 2. **Install dependencies**
    ```bash
-   pip install PyQt5 opencv-python numpy pandas scipy matplotlib paramiko python-dotenv pyyaml tqdm statsmodels
+   pip install -r requirements.txt
    ```
 
 3. **Configure environment variables**
@@ -70,216 +54,265 @@ video annotation to metrics calculation with cluster computing suppor
    python source/main_window.py
    ```
 
-## 📖 Usage Guide
+## 📖 How to Use the Application
 
-### 1. Project Creation
-- **Tab 1: Project Management**
-  - Click "Create New Project"
-  - Fill in project details (name, author, experiment type)
-  - Select source folder containing video files
-  - Configure filename structure (number of fields and field names)
-  - Validate that all video filenames match the expected structure
-  - Videos are copied to the project folder with organized structure
+### 1. Project Management (Tab 1)
+**Navigate to Tab 1: Project Management**
 
-### 2. Video Annotation
-- **Tab 2: Video Points Annotation**
-  - Click "Open video annotation tool"
-  - For each video, mark 4 corner points of the arena:
-    - Top-left (red)
-    - Top-right (green) 
-    - Bottom-right (blue)
-    - Bottom-left (orange)
-  - Use keyboard shortcuts:
-    - Arrow keys: Navigate between videos
-    - `R`: Reset current video points
-    - `S`: Save progress
-  - Submit annotated videos to cluster for preprocessing
+1. **Create New Project**:
+   - Click **"🖊️ Create New Project"**
+   - Fill in project details (name, author, experiment type)
+   - Select folder containing your video files
+   - Configure filename structure:
+     - Set number of fields (separated by underscores)
+     - Name each field (e.g., "Subject", "Treatment", "Day")
+     - Optional: Set up field merging for statistical grouping
+   - Example: `Mouse1_Control_Low_Day1.mp4` → 4 fields
 
-### 3. Tracking and Analysis
-- **Tab 3: Animal Tracking + Results**
-  - Run tracking on preprocessed videos
-  - Calculate behavioral metrics
-  - View trajectory visualizations
-  - Export results as CSV
+2. **Load Existing Project**:
+   - Click **"📂 Load Existing Project"**
+   - Select project YAML file
+   - Project details and progress status will be displayed
 
-### 4. Statistical Analysis
-- **Tab 4: Statistical Analysis**
-  - Load CSV results with parsed filename components
-  - Select grouping factors based on your filename structure
-  - Choose behavioral metrics for analysis
-  - Run statistical tests:
-    - **t-test**: Compare exactly 2 groups
-    - **One-way ANOVA**: Compare 2+ groups with one factor
-    - **Two-way ANOVA**: Analyze two factors and their interaction
-  - View comprehensive results with effect sizes and significance
-  - Export statistical results for publication
+### 2. Video Points Annotation (Tab 2)
+**Navigate to Tab 2: Video Points Annotation**
 
-## 📊 Metrics Calculated
+1. **Mark Arena Corners** for each video (4 points required):
+   - **Top-left corner** (red point)
+   - **Top-right corner** (green point) 
+   - **Bottom-right corner** (blue point)
+   - **Bottom-left corner** (orange point)
 
-### **Movement Metrics**
-- **Total Distance**: Cumulative distance traveled
-- **Velocity**: Instantaneous and average movement speed
-- **Time Moving**: Percentage of time the animal is active
+2. **Navigation and Controls**:
+   - **Arrow keys**: Navigate between videos
+   - **R key**: Reset points for current video
+   - **S key**: Save progress
+   - **Mouse clicks**: Place corner points
 
-### **Spatial Metrics**
-- **Thigmotaxis**: Preference for arena periphery vs center
-- **Center Time**: Time spent in arena center
-- **Distance to Wall**: Spatial distribution analysis
+3. **Submit for Processing**: Click "Process data on computational cluster" when all videos are annotated
+
+### 3. Animal Tracking + Results (Tab 3)
+**Navigate to Tab 3: Animal Tracking + Results**
+
+1. **Run Tracking**: 
+   - Click **"🚀 Run Tracking"** to submit videos to cluster
+   - Expected runtime notification will be displayed
+   - Track progress via status updates
+
+2. **Calculate Results**:
+   - Click **"📊 Get Results"** after tracking is complete
+   - Metrics will be calculated for all tracked videos
+   - Progress updates shown during calculation
+
+3. **View Results**:
+   - **Trajectory Preview**: Browse generated trajectory images
+   - **Metrics Table**: View calculated behavioral metrics
+   - **Folder Access**: Quick access to images and results folders
+
+### 4. Statistical Analysis (Tab 4)
+**Navigate to Tab 4: Statistical Analysis**
+
+1. **Load Data**: Import CSV results file with automatic filename parsing
+2. **Configure Analysis**:
+   - Select **grouping factors** from your filename structure
+   - Choose **behavioral metrics** to analyze
+   - Select **statistical test**:
+     - **t-test**: Compare exactly 2 groups
+     - **One-way ANOVA**: Compare multiple groups with one factor
+     - **Two-way ANOVA**: Analyze two factors and their interaction
+3. **Run Analysis**: Click "🔬 Run Analysis" for comprehensive statistical output
+4. **Export Results**: Save statistical summaries and detailed results
+
+## 📊 Behavioral Metrics Calculated
+
+### **Core Movement Metrics**
+- **`total_distance`**: Total distance traveled throughout session
+- **`is_moving`**: Proportion of time animal is actively moving
+- **Velocity calculations**: Speed analysis with configurable thresholds
+
+### **Spatial Behavior Metrics**
+- **`thigmotaxis`**: Wall-hugging behavior (0 = center preference, 1 = wall preference)
+- **`is_center`**: Proportion of time spent in arena center
+- **`is_moving_in_center`**: Active exploration of center region
+- **Distance to wall**: Proximity analysis to arena boundaries
 
 ### **Temporal Analysis**
-- **Time-binned Metrics**: Analysis in configurable time windows (default: 5 minutes)
-- **Activity Patterns**: Movement patterns over time
+- **Time-binned distances**: Distance traveled in configurable time windows
+- **Format**: `D_0_to_5`, `D_5_to_10`, etc. (default 5-minute bins)
+- **Adaptive binning**: Automatically handles sessions of different lengths
 
-### **Behavioral Indicators**
-- **Exploration**: Center exploration vs wall-following behavior
-- **Anxiety-like Behavior**: Thigmotaxis and center avoidance measures
+### **Advanced Metrics**
+- **Velocity thresholding**: Configurable minimum velocity for movement detection
+- **Motion smoothing**: Gaussian filtering for trajectory noise reduction
+- **Arena size normalization**: Automatic scaling based on arena dimensions
 
 ## 📈 Statistical Analysis Features
 
-### **Automated Filename Parsing**
-- Automatically parses filenames into separate columns based on YAML configuration
-- Creates grouping factors from filename structure (e.g., Subject, Treatment, Dosage)
-- Enables complex experimental design analysis
+### **Automatic Data Processing**
+- **Filename Parsing**: Extracts experimental factors from video filenames
+- **Data Validation**: Ensures consistent grouping and data quality
+- **Missing Data Handling**: Robust processing of incomplete datasets
 
-### **Statistical Tests**
-- **Independent t-test**: Compare behavioral metrics between 2 groups
-  - Levene's test for equal variances
-  - Welch's t-test for unequal variances
-  - Effect size and confidence intervals
+### **Statistical Tests Available**
 
-- **One-way ANOVA**: Compare behavioral metrics across multiple groups
-  - F-statistics and p-values
-  - Degrees of freedom
-  - Post-hoc comparisons
+#### **Independent t-test**
+- Compare behavioral metrics between exactly 2 groups
+- Levene's test for variance equality assessment
+- Welch's t-test for unequal variances when needed
+- Comprehensive descriptive statistics
 
-- **Two-way ANOVA**: Analyze interaction effects between two factors
-  - Main effects for each factor
-  - Interaction effects (Factor A × Factor B)
-  - R² and adjusted R² for model fit
-  - Comprehensive effect size analysis
+#### **One-way ANOVA**
+- Compare multiple groups on behavioral measures
+- F-statistics with degrees of freedom
+- Significance testing with p-values
+- Automatic Tukey HSD post-hoc testing (when statsmodels available)
+
+#### **Two-way ANOVA**
+- Analyze main effects and interactions between two factors
+- Factor A and Factor B main effects
+- A × B interaction effects
+- R² and adjusted R² for effect size quantification
+- Model fit assessment
 
 ### **Results Presentation**
-- **Summary View**: Text-based results with statistical significance indicators
-- **Detailed Table**: Organized results for each effect and metric
-- **Export Functionality**: Save results for publication and further analysis
-- **Real-time Processing**: Threaded analysis prevents UI freezing
-
-### **Experimental Design Support**
-- **Multi-factor Designs**: Analyze complex experimental designs with multiple grouping variables
-- **Interaction Analysis**: Understand how factors combine to affect behavior
-- **Effect Size Reporting**: R² values show practical significance beyond statistical significance
-- **Group Comparisons**: Detailed descriptive statistics for each experimental condition
+- **Comprehensive Output**: Descriptive statistics, test results, and effect sizes
+- **Significance Indicators**: Clear marking of significant results
+- **Export Options**: Multiple file formats for publication and archiving
+- **Real-time Processing**: Threaded analysis prevents interface freezing
 
 ## 🏗️ Project Structure
 
 ```
 PipelineApp/
 ├── source/
-│   ├── main_window.py              # Main application entry point
-│   ├── cluster_networking/         # Cluster communication modules
-│   │   ├── ssh_handling.py         # SSH and SLURM job management
-│   │   ├── preprocessing.py        # Video preprocessing pipeline
-│   │   ├── tracking.py             # Animal tracking pipeline
-│   │   └── utils.py                # Utility functions
-│   ├── file_management/            # File status and management
-│   │   ├── active_file_check.py    # File processing status tracking
-│   │   └── status.py               # Status enumeration
-│   ├── gui/                        # User interface components
-│   │   ├── create_project.py       # Project creation dialog
-│   │   ├── project_management_tab.py # Project management interface
-│   │   ├── video_points_annotation_tab.py # Video annotation interface
-│   │   ├── video_points_widget.py  # Video annotation widget
-│   │   ├── tracking_results_tab.py # Results and metrics interface
-│   │   ├── statistical_analysis_tab.py # Statistical analysis interface
-│   │   └── style.py                # GUI styling and constants
-│   └── metric_calculation/         # Behavioral analysis modules
-│       ├── metrics_pipeline.py     # Main metrics calculation pipeline
-│       ├── trajectory.py           # Trajectory processing and analysis
-│       ├── metrics.py              # Behavioral metrics calculations
-│       ├── visualization.py        # Trajectory plotting and visualization
-│       └── utils.py                # Metrics utility functions
-└── README.md
+│   ├── main_window.py                    # Application entry point
+│   ├── cluster_networking/               # Cluster communication
+│   │   ├── ssh_handling.py               # SSH and SLURM management
+│   │   ├── preprocessing.py              # Video preprocessing pipeline
+│   │   ├── tracking.py                   # Animal tracking pipeline
+│   │   └── expected_runtime.py           # Runtime estimation
+│   ├── file_management/                  # File operations
+│   │   ├── active_file_check.py          # Processing status tracking
+│   │   └── status.py                     # Status enumeration
+│   ├── gui/                              # User interface
+│   │   ├── project_management_tab.py     # Tab 1: Project management
+│   │   ├── video_points_annotation_tab.py # Tab 2: Video annotation
+│   │   ├── tracking_results_tab.py       # Tab 3: Results and metrics
+│   │   ├── statistical_analysis_tab.py   # Tab 4: Statistical analysis
+│   │   ├── create_project.py             # Project creation dialog
+│   │   ├── manual_dialog.py              # Documentation viewer
+│   │   └── scaling.py                    # DPI scaling management
+│   ├── metric_calculation/               # Behavioral analysis
+│   │   ├── metrics_pipeline.py           # Main metrics pipeline
+│   │   ├── metrics.py                    # Core metrics calculations
+│   │   ├── trajectory.py                 # Trajectory processing
+│   │   └── visualization.py              # Plot generation
+│   ├── documentation/                    # Embedded documentation
+│   │   ├── readme_content.py             # README content
+│   │   ├── statistical_analysis_manual.py # Statistics guide
+│   │   ├── field_merging_guide.py        # Field merging tutorial
+│   │   └── tukey_hsd_update.py           # Recent updates info
+│   └── utils/                            # Utilities
+│       └── settings_manager.py           # Configuration management
+├── installer/                            # Windows installer
+├── requirements.txt                      # Python dependencies
+└── README.md                            # This file
 ```
 
 ## 🔧 Configuration
 
-### **Filename Structure Configuration**
-Projects support configurable filename structures to organize experimental data:
-- Define number of fields (separated by underscores)
-- Name each field (e.g., "subject", "condition", "trial")
-- Automatic validation ensures all files follow the same structure
-- Example: `mouse1_control_trial1.mp4` → subject: "mouse1", condition: "control", trial: "trial1"
+### **Settings Management**
+Key parameters can be configured via `utils/settings_manager.py`:
+- **Arena dimensions**: Default 80cm × 80cm
+- **Velocity threshold**: Minimum speed for movement detection (default: 1.0)
+- **Time binning**: Analysis window size (default: 5 minutes)
+- **Thigmotaxis bins**: Spatial resolution for wall preference (default: 25 bins)
+
+### **Filename Structure**
+Projects support flexible filename structures:
+- **Field Definition**: Number and names of filename components
+- **Field Merging**: Combine fields for statistical grouping
+- **Validation**: Automatic checking of filename consistency
+- **Example**: `Subject_Treatment_Dose_Day.mp4` creates 4 grouping factors
 
 ### **Cluster Configuration**
-The application supports various cluster configurations through environment variables:
-- Custom SLURM partition and resource requirements
-- Configurable conda environments
-- Flexible path mapping between local and cluster filesystems
+Environment variables control cluster interaction:
+- **Connection**: SSH credentials and host information
+- **Paths**: Local and remote file system mapping
+- **Environment**: Conda environment for processing jobs
+- **Resources**: SLURM partition and resource allocation
 
-### **Processing Parameters**
-Key processing parameters can be adjusted in the code:
-- **Arena size**: Default 80cm x 80cm
-- **Detection threshold**: Minimum confidence for pose detection
-- **Motion blur sigma**: Gaussian smoothing for trajectory
-- **Time bin size**: Temporal analysis window (default: 5 minutes)
+## 🎨 User Interface Features
 
-## 🎨 User Interface
+### **Modern Design**
+- **Dark Theme**: Optimized for extended use with reduced eye strain
+- **Responsive Layout**: Automatic scaling for different screen sizes
+- **Color-coded Status**: Visual indicators for processing pipeline stages
+- **Tab-based Workflow**: Logical progression through analysis steps
 
-### **Dark Theme**
-- Modern dark theme optimized for extended use
-- Color-coded status indicators
-- Intuitive tab-based workflow
+### **Real-time Feedback**
+- **Progress Tracking**: Live updates during long-running operations
+- **Status Visualization**: Color-coded file processing status
+- **Error Handling**: Comprehensive error reporting and recovery
+- **Documentation**: Built-in manual and help system
 
-### **Progress Tracking**
-- Real-time progress bars for file operations
-- Status visualization for pipeline stages
-- Detailed logging and error reporting
-
-### **Interactive Video Annotation**
-- Frame-by-frame video navigation
-- Visual feedback for annotation points
-- Batch processing support
+### **Data Visualization**
+- **Trajectory Plots**: High-quality trajectory visualizations
+- **Navigation Tools**: Browse through result images
+- **Export Options**: Publication-ready image and data export
+- **Interactive Tables**: Sortable and searchable results display
 
 ## 🔬 Scientific Applications
 
-This pipeline is designed for:
-- **Behavioral Neuroscience**: Anxiety, depression, locomotor activity studies
-- **Pharmacology**: Drug effects on behavior and movement
-- **Genetic Studies**: Behavioral phenotyping of transgenic animals
-- **Environmental Studies**: Effects of environmental factors on behavior
-
 ### **Supported Paradigms**
-- **Open Field Test (OFT)**: General locomotor activity and anxiety-like behavior
-- **Elevated Plus Maze (EPM)**: Anxiety-related behavior (planned implementation)
+- **Open Field Test (OFT)**: Locomotor activity and anxiety-like behavior assessment
+- **Elevated Plus Maze (EPM)**: Anxiety-related behavior analysis (framework ready)
+
+### **Research Applications**
+- **Behavioral Neuroscience**: Anxiety, depression, and locomotor studies
+- **Pharmacology**: Drug effects on behavior and movement patterns
+- **Genetics**: Behavioral phenotyping of transgenic animals
+- **Environmental Studies**: Effects of environmental manipulations
+
+### **Experimental Design Support**
+- **Multi-factor Designs**: Complex experimental designs with multiple variables
+- **Temporal Analysis**: Track behavioral changes over time
+- **Dose-Response Studies**: Analyze graded treatment effects
+- **Interaction Studies**: Understand how factors combine to affect behavior
+
+## 📞 Support and Documentation
+
+### **Built-in Help System**
+- **📋 User Manual**: Comprehensive usage guide accessible via GUI
+- **📊 Statistical Analysis Manual**: Detailed statistics tutorial
+- **🔗 Field Merging Guide**: Tutorial for complex filename structures
+- **📈 Update Information**: Recent feature additions and changes
+
+### **Troubleshooting**
+- **Status Indicators**: Check processing pipeline status in Tab 1
+- **Log Files**: Detailed error logging for debugging
+- **Cluster Connectivity**: Verify SSH credentials and network access
+- **File Validation**: Ensure video formats and filename structures are correct
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions welcome! Key areas for development:
+- Additional behavioral metrics
+- New statistical tests
+- Enhanced visualization options
+- Local processing capabilities
+- Additional experimental paradigms
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
-- Built for behavioral neuroscience research
-- Designed for high-throughput experimental workflows
+- Designed for high-throughput behavioral neuroscience research
 - Optimized for cluster computing environments
-
-## 📞 Support
-
-For questions or issues:
-1. Check the project status indicators in Tab 1
-2. Review the processing logs for error messages
-3. Ensure cluster connectivity and credentials are correct
-4. Verify video file formats and filename structure
-5. **For statistical analysis**: See the [Statistical Analysis Manual](STATISTICAL_ANALYSIS_MANUAL.md) for detailed usage guide
-
-## 📚 Documentation
-
-- **[Statistical Analysis Manual](STATISTICAL_ANALYSIS_MANUAL.md)**: Comprehensive guide for the statistical analysis functionality
-- **README.md**: This overview and installation guide
+- Built with modern PyQt5 interface design principles
 
 ---
 
-**Note**: This application requires access to a SLURM cluster for video preprocessing and tracking. Local processing capabilities may be added in future versions.
+**Note**: This application requires SSH access to a SLURM cluster for video preprocessing and animal tracking. Ensure proper cluster configuration before beginning analysis.
