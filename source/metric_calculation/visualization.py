@@ -3,6 +3,8 @@ from pandas import DataFrame
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.collections import LineCollection
+from typing import Optional
+from utils.settings_manager import get_setting
 
 
 def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
@@ -35,15 +37,24 @@ def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
 
     return ax.add_collection(lc)
 
-def plot_trajectory_figure(df: DataFrame, save_path: str, arena_side_cm: float = 80,
-                           start_time: float = 0, end_time: float = np.inf) -> None:
+def plot_trajectory_figure(df: DataFrame, save_path: str, arena_side_cm: Optional[float] = None,
+                           start_time: Optional[float] = None, end_time: Optional[float] = None) -> None:
+    # Use settings if parameters not provided
+    if arena_side_cm is None:
+        arena_side_cm = float(get_setting("arena_side_cm", 80.0))
+    if start_time is None:
+        start_time = float(get_setting("viz_start_time", 0.0))
+    if end_time is None:
+        viz_end_time = get_setting("viz_end_time", float('inf'))
+        end_time = float('inf') if viz_end_time == float('inf') else viz_end_time
+    
     df = df[(df['timestamps'] >= start_time) & (df['timestamps'] <= end_time)]
     X, Y, T = df['x'].to_numpy(), df['y'].to_numpy(), df['timestamps'].to_numpy()
     # Setup
     fig, ax = plt.subplots()
     plt.rcParams.update({'font.weight': 'normal', 'font.size': 14})
     fig.set_size_inches((7.95, 7.3))
-    b = 8
+    b = get_setting("viz_border_size", 8)
 
     # Arena creation
     rectangle_outer = patches.Rectangle((-b, -b), arena_side_cm + 2 * b, arena_side_cm + 2 * b, linewidth=1, edgecolor='black', facecolor='gray')

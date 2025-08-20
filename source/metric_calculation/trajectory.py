@@ -6,7 +6,8 @@ import cv2
 
 from pandas import DataFrame
 from numpy.typing import NDArray
-from typing import Tuple
+from typing import Tuple, Optional
+from utils.settings_manager import get_setting
 
 
 def gaussian_blur_nan(y: NDArray, sigma: float) -> NDArray:
@@ -55,7 +56,15 @@ def point_to_line_distance(X: NDArray, Y: NDArray) -> NDArray:
     
     return np.abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / np.sqrt((y2 - y1)**2 + (x2 - x1)**2)
 
-def remove_small_clusters(arr : NDArray, cluster_size: int) -> NDArray:
+def remove_small_clusters(arr : NDArray, cluster_size: Optional[int] = None) -> NDArray:
+    if cluster_size is None:
+        cluster_removal_enabled = get_setting("cluster_removal_enabled", True)
+        if not cluster_removal_enabled:
+            return arr
+        min_cluster_size_seconds = get_setting("min_cluster_size_seconds", 1.0)
+        # Estimate fps from array - this is a rough estimate
+        cluster_size = max(1, int(min_cluster_size_seconds * 30))  # Assume ~30 fps
+    
     arr = np.array(arr, dtype=float)  # Ensure it's a NumPy array of floats (to support np.nan)
     mask = np.isnan(arr)
     
@@ -76,14 +85,29 @@ def remove_small_clusters(arr : NDArray, cluster_size: int) -> NDArray:
         clusters.append((start, len(arr)))
     
     # Remove clusters with <= N elements
+    cluster_padding_factor = get_setting("cluster_padding_factor", 0.2)
+    padding = max(1, int(cluster_size * cluster_padding_factor))
+    
     for start, end in clusters:
         if end - start <= cluster_size:
-            arr[max(start - cluster_size // 5, 0):min(end + cluster_size // 5, len(arr) - 1)] = np.nan
+            arr[max(start - padding, 0):min(end + padding, len(arr) - 1)] = np.nan
 
     return arr
 
-def calculate_body_size(dataframe: DataFrame, arena_side_cm: float = 80.0,  arena_side_px: int = 1000, corner_px: int = 100,
-                        detection_threshold: float = 0.9, on_line_threshold: float = 0.25) -> Tuple[float, float]:
+def calculate_body_size(dataframe: DataFrame, arena_side_cm: Optional[float] = None, arena_side_px: Optional[int] = None, corner_px: Optional[int] = None,
+                        detection_threshold: Optional[float] = None, on_line_threshold: Optional[float] = None) -> Tuple[float, float]:
+    # Use settings if parameters not provided
+    if arena_side_cm is None:
+        arena_side_cm = float(get_setting("arena_side_cm", 80.0))
+    if arena_side_px is None:
+        arena_side_px = int(get_setting("arena_size_px", 1000))
+    if corner_px is None:
+        corner_px = int(get_setting("corner_px", 100))
+    if detection_threshold is None:
+        detection_threshold = float(get_setting("body_size_detection_threshold", 0.9))
+    if on_line_threshold is None:
+        on_line_threshold = float(get_setting("body_size_on_line_threshold", 0.25))
+    
     trajectory_nose = dataframe.nose
     trajectory_neck = dataframe.neck
     trajectory_tail = dataframe.tail_start
@@ -126,8 +150,20 @@ def calculate_body_size(dataframe: DataFrame, arena_side_cm: float = 80.0,  aren
     return float(body_size), float(head_size)
 
 def calculate_trajectory(dataframe: DataFrame,
-                         arena_side_cm: float = 80, arena_size_px: int = 1000,corner_px: int = 100,
-                         detection_threshold: float = 0.6, motion_blur_sigma: float = 2) -> DataFrame:
+                         arena_side_cm: Optional[float] = None, arena_size_px: Optional[int] = None, corner_px: Optional[int] = None,
+                         detection_threshold: Optional[float] = None, motion_blur_sigma: Optional[float] = None) -> DataFrame:
+    # Use settings if parameters not provided
+    if arena_side_cm is None:
+        arena_side_cm = float(get_setting("arena_side_cm", 80.0))
+    if arena_size_px is None:
+        arena_size_px = int(get_setting("arena_size_px", 1000))
+    if corner_px is None:
+        corner_px = int(get_setting("corner_px", 100))
+    if detection_threshold is None:
+        detection_threshold = float(get_setting("trajectory_detection_threshold", 0.6))
+    if motion_blur_sigma is None:
+        motion_blur_sigma = float(get_setting("motion_blur_sigma", 2.0))
+    
     timestamps = dataframe['timestamps'].values
     time_step = timestamps[1] - timestamps[0] if len(timestamps) > 1 else 1
     
@@ -159,8 +195,17 @@ def calculate_trajectory(dataframe: DataFrame,
     X[L.max(1) < detection_threshold] = np.nan
     Y[L.max(1) < detection_threshold] = np.nan
 
-    X = remove_small_clusters(X, 1 * int(1 / time_step))
-    Y = remove_small_clusters(Y, 1 * int(1 / time_step))
+    # Calculate cluster size based on settings and frame rate
+    cluster_removal_enabled = get_setting("cluster_removal_enabled", True)
+    if cluster_removal_enabled:
+        min_cluster_size_seconds = get_setting("min_cluster_size_seconds", 1.0)
+        fps = int(1 / time_step)
+        cluster_size = max(1, int(min_cluster_size_seconds * fps))
+    else:
+        cluster_size = None
+    
+    X = remove_small_clusters(X, cluster_size)
+    Y = remove_small_clusters(Y, cluster_size)
     
     X = gaussian_blur_nan(X, sigma=motion_blur_sigma)
     Y = gaussian_blur_nan(Y, sigma=motion_blur_sigma)

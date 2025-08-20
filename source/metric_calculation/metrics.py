@@ -1,8 +1,9 @@
 import numpy as np
 
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 from pandas import DataFrame
 from numpy.typing import NDArray
+from utils.settings_manager import get_setting
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -27,7 +28,8 @@ def get_velocity(frame: DataFrame) -> Tuple[NDArray, NDArray]:
     vx = dx / dt
     vy = dy / dt
     v = np.sqrt(vx**2 + vy**2)
-    v[v < 1] = 0
+    velocity_threshold = get_setting("velocity_threshold", 1.0)
+    v[v < velocity_threshold] = 0
 
     return v, t
 
@@ -41,17 +43,22 @@ def get_total_distance(velocity: NDArray, time: NDArray, t_start: float, t_end: 
     s = s[~np.isnan(s)]
     return np.sum(s * dt) / (1 - p_nan)
 
-def get_distance_to_wall(x: np.ndarray, y: np.ndarray, arena_size: Tuple[float, float] | float = (80.0, 80.0)) -> np.ndarray:
+def get_distance_to_wall(x: np.ndarray, y: np.ndarray, arena_size: Optional[Tuple[float, float] | float] = None) -> np.ndarray:
+        if arena_size is None:
+            arena_side_cm = get_setting("arena_side_cm", 80.0)
+            arena_size = (arena_side_cm, arena_side_cm)
         if type(arena_size) == float:
             arena_size = (arena_size, arena_size)
         x_dist = np.minimum(np.abs(x), np.abs(x - arena_size[1])) # type: ignore
         y_dist = np.minimum(np.abs(y), np.abs(y - arena_size[0])) # type: ignore
         return np.minimum(x_dist, y_dist)
     
-def get_thigmotaxis(x: NDArray, y: NDArray, arena_size: float = 80, bin_count: int = 25) -> float:  
-    bin_count = 25
-    arena_size = 80
-
+def get_thigmotaxis(x: NDArray, y: NDArray, arena_size: Optional[float] = None, bin_count: Optional[int] = None) -> float:
+    if arena_size is None:
+        arena_size = float(get_setting("arena_side_cm", 80.0))
+    if bin_count is None:
+        bin_count = int(get_setting("thigmotaxis_bin_count", 25))
+        
     bin_side = int(np.sqrt(bin_count))
     bin_size = arena_size / float(bin_side)
 
@@ -89,7 +96,31 @@ def get_thigmotaxis(x: NDArray, y: NDArray, arena_size: float = 80, bin_count: i
     
     return 1 - float(center.sum() / M.sum())
 
-def calculate_metrics(frame: DataFrame, arena_size_cm: float = 80.0, body_size: float = 1.0, head_size: float = 1.0, timebin_minutes: float = 5.0, max_time: float = np.inf) -> Dict[str, float]:
+def calculate_metrics(frame: DataFrame, arena_size_cm: Optional[float] = None, body_size: Optional[float] = None, head_size: Optional[float] = None, timebin_minutes: Optional[float] = None, max_time: Optional[float] = None) -> Dict[str, float]:
+    # Use settings if parameters not provided
+    if arena_size_cm is None:
+        arena_size_cm = float(get_setting("arena_side_cm", 80.0))
+    if body_size is None:
+        body_size_mode = get_setting("body_size_mode", "auto")
+        if body_size_mode == "manual":
+            body_size = float(get_setting("manual_body_size", 1.0))
+        else:
+            body_size = 1.0  # Will be calculated later
+    if head_size is None:
+        head_size_mode = get_setting("head_size_mode", "auto")
+        if head_size_mode == "manual":
+            head_size = float(get_setting("manual_head_size", 1.0))
+        else:
+            head_size = 1.0  # Will be calculated later
+    if timebin_minutes is None:
+        timebin_minutes = float(get_setting("timebin_minutes", 5.0))
+    if max_time is None:
+        max_time_minutes = get_setting("max_time_minutes", float('inf'))
+        max_time = float('inf') if max_time_minutes == float('inf') else max_time_minutes * 60  # Convert to seconds
+    
+    # Ensure max_time is not None for type checking
+    assert max_time is not None
+    
     velocity, time = get_velocity(frame)
     fps = np.round(1 / np.diff(frame["timestamps"].to_numpy(), 1).mean()).astype(int)
     total_distance = get_total_distance(velocity, time, t_start=0, t_end=np.inf)

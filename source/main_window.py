@@ -18,13 +18,14 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QTabWidget,
 )
-from PyQt5.QtCore import Qt
+
 from PyQt5.QtGui import QFont, QIcon
 
 # Local application imports
 from file_management.status import Status
 from gui.project_management_tab import ProjectManagementTab
 from gui.scaling import get_scaling_manager
+from gui.settings_dialog import SettingsDialog
 from gui.statistical_analysis_tab import StatisticalAnalysisTab
 from gui.style import get_scaled_dark_style
 from gui.tracking_results_tab import TrackingResultsTab
@@ -32,6 +33,7 @@ from gui.video_points_annotation_tab import VideoPointsAnnotationTab
 from metric_calculation.metrics_pipeline import run_metrics_pipeline
 from metric_calculation.utils import construct_metric_dataframe
 from utils.logging_config import init_logging, get_logger
+from utils.settings_manager import reload_settings
 
 
 class MainWindow(QMainWindow):
@@ -85,8 +87,8 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        # Create exit button in top right
-        self.create_exit_button()
+        # Create menu bar with settings and exit buttons
+        self.create_menu_bar()
 
         # Initially disable tabs 2, 3, and 4
         self.tabs.setTabEnabled(1, False)
@@ -128,6 +130,67 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error setting window icon: {e}")
 
+    def create_menu_bar(self) -> None:
+        """Create a menu bar with settings and exit buttons."""
+        # Create menu bar
+        self.menubar = self.menuBar()
+        if self.menubar is None:
+            return
+        
+        # Create settings action
+        settings_action = QAction("⚙️ Settings", self)
+        settings_action.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        settings_action.setStatusTip('Configure pipeline settings')
+        settings_action.triggered.connect(self.open_settings)
+        self.menubar.addAction(settings_action)
+        
+        # Create exit action
+        exit_action = QAction("❌ Exit", self)
+        exit_action.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        exit_action.setStatusTip('Exit application')
+        exit_action.triggered.connect(self.close_application)
+        self.menubar.addAction(exit_action)
+        
+        # Style the menu bar with right alignment for the buttons
+        self.menubar.setStyleSheet("""
+            QMenuBar {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+                border-bottom: 2px solid #4dd0e1;
+                padding: 5px;
+                font-size: 12pt;
+                text-align: right;
+            }
+            QMenuBar::item {
+                background-color: transparent;
+                padding: 8px 16px;
+                margin: 2px;
+                border-radius: 6px;
+                float: right;
+            }
+            QMenuBar::item:selected {
+                background-color: #4dd0e1;
+                color: white;
+            }
+            QMenuBar::item:pressed {
+                background-color: #26a69a;
+            }
+            QMenuBar::item:first-child:selected {
+                background-color: #ff4444;
+            }
+            QMenuBar::item:first-child:pressed {
+                background-color: #cc3333;
+            }
+        """)
+
+    def open_settings(self) -> None:
+        """Open the settings dialog."""
+        dialog = SettingsDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            # Settings were saved, reload them in the settings manager
+            reload_settings()
+            self.logger.info("Pipeline settings updated")
+    
     def create_exit_button(self) -> None:
         """Create an exit button in the top right corner."""
         # Create menu bar
