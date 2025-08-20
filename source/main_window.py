@@ -3,14 +3,12 @@ Main Window for the Video Tracking Pipeline Application.
 """
 
 # Standard library imports
-import logging
 import os
 import sys
 from pathlib import Path
 from typing import Dict, Optional
 
 # Third-party imports
-import pandas as pd
 from pandas import DataFrame
 from PyQt5.QtWidgets import (
     QAction,
@@ -18,9 +16,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QMainWindow,
     QMessageBox,
-    QPushButton,
     QTabWidget,
-    QWidget
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon

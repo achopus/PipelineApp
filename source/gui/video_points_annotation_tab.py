@@ -120,7 +120,7 @@ class VideoPointsAnnotationTab(QWidget):
                     QMessageBox.information(
                         self,
                         "Preprocessing Status",
-                        f"Sending all annotated videos to cluster for preprocessing.\nProcessing is expected to finish at {finish_time.toString()}"
+                        f"Sending all annotated videos to cluster for preprocessing.\nProcessing is expected to finish at {finish_time.toString('dd.MM hh:mm:ss')}"
                     )
                 else:
                     QMessageBox.warning(

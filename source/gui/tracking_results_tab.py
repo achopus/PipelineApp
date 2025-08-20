@@ -7,6 +7,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timedelta
 
 import pandas as pd
 from pandas import DataFrame
@@ -16,6 +17,7 @@ from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QTableWidget,
@@ -23,10 +25,12 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QSizePolicy
+    QSizePolicy,
 )
 
+from file_management.status import Status
 from cluster_networking.tracking import cluster_tracking
+from cluster_networking.expected_runtime import tracking_runtime
 
 
 class TrackingResultsTab(QWidget):
@@ -348,6 +352,14 @@ class TrackingResultsTab(QWidget):
         def run_tracking():
             """Start the tracking process."""
             if self.parent_window and hasattr(self.parent_window, 'yaml_path'):
+                videos = [os.path.join(v) for v in os.listdir(os.path.join(self.parent_window.folder_path, "videos_preprocessed")) if self.parent_window.status[v] == Status.READY_TRACKING]
+                expected_runtime = tracking_runtime(videos)
+                finish_time = datetime.now() + timedelta(seconds=expected_runtime)
+                QMessageBox.information(
+                    self,
+                    "Expected Runtime",
+                    f"Tracking will complete around:\n{finish_time.strftime('%d.%m %H:%M:%S')}"
+                )
                 cluster_tracking(self.parent_window.yaml_path)  # type: ignore
             
         def calculate_results():
@@ -391,7 +403,6 @@ class TrackingResultsTab(QWidget):
         preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
 
         if not os.path.exists(preprocessed_folder):
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.warning(
                 self, 
                 "Warning", 
@@ -437,7 +448,7 @@ class TrackingResultsTab(QWidget):
         total = len(files_loaded)
         not_ready = total - done_count
 
-        from PyQt5.QtWidgets import QMessageBox
+
         QMessageBox.information(
             self,
             "Preprocessing Status",

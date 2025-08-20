@@ -3,7 +3,6 @@ Utility functions for cluster networking operations.
 """
 
 import os
-from typing import Optional
 from dotenv import load_dotenv
 
 

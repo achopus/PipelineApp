@@ -4,7 +4,7 @@ Logging configuration for the Video Tracking Application.
 
 import logging
 import logging.handlers
-import os
+
 from pathlib import Path
 from typing import Optional
 

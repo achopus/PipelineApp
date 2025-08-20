@@ -6,7 +6,6 @@ import sys
 from typing import Tuple, Union, Optional
 from PyQt5.QtWidgets import QApplication, QDesktopWidget
 from PyQt5.QtCore import QRect
-from PyQt5.QtGui import QScreen
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)

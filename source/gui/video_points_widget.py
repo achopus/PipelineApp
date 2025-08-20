@@ -8,7 +8,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor, QGuiApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint
-from PyQt5.QtCore import Qt as QtCore
 from gui.scaling import get_scaling_manager
 from utils.logging_config import get_logger
 
