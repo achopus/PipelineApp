@@ -28,11 +28,11 @@ class VideoPointsWidget(QWidget):
         screen_rect = self.scaling_manager.screen_rect
         if screen_rect is not None:
             # Use 85% of screen width for video, ensuring it fits well (increased from 70%)
-            self.max_video_width = int(screen_rect.width())
-            self.max_video_height = int(screen_rect.height())
+            self.max_video_width = int(screen_rect.width() * 0.85)
+            self.max_video_height = int(screen_rect.height() * 0.85)
         else:
             # Fallback values (increased proportionally)
-            self.max_video_width = 1500
+            self.max_video_width = 1200
             self.max_video_height = 1000
 
         # Colors and corner labels
@@ -267,7 +267,7 @@ class VideoPointsWidget(QWidget):
         # Compute display scaling: max 80% of screen height
         screen = QGuiApplication.primaryScreen()
         screen_height = screen.availableGeometry().height() if screen is not None else 1080
-        max_display_h = int(screen_height * 0.8)
+        max_display_h = int(screen_height)
 
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -350,6 +350,7 @@ class VideoPointsWidget(QWidget):
             painter.setPen(pen)
             painter.drawPoint(dx, dy)
 
+        """
         # Draw video index and filename top-left corner (display coords)
         painter.setPen(QColor('white'))
         font = QFont()
@@ -364,6 +365,7 @@ class VideoPointsWidget(QWidget):
             text_margin = text_margin[0]
         painter.drawText(text_margin, scaled_font_size + 10, text)
 
+        """
         painter.end()
 
         self.video_label.setPixmap(pixmap)

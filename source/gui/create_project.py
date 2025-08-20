@@ -21,11 +21,182 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QMessageBox,
     QGroupBox,
-    QTextEdit
+    QTextEdit,
+    QCheckBox,
+    QListWidgetItem
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, Qt as QtCore
 
 from gui.style import PROJECT_FOLDER
+
+
+class MergeGroupDialog(QDialog):
+    """Dialog to configure a merge group for filename fields."""
+    
+    def __init__(self, field_names: list[str], parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setWindowTitle("Configure Merge Group")
+        self.setModal(True)
+        self.resize(400, 300)
+        
+        self.field_names = field_names
+        
+        layout = QVBoxLayout()
+        
+        layout.addWidget(QLabel("Select fields to merge together:"))
+        layout.addWidget(QLabel("(Fields will be combined with '_' separator)"))
+        
+        # Create checkboxes for each field
+        self.field_checkboxes = []
+        for i, field_name in enumerate(field_names):
+            checkbox = QCheckBox(f"{i+1}. {field_name}")
+            self.field_checkboxes.append(checkbox)
+            layout.addWidget(checkbox)
+        
+        # Buttons
+        buttons_layout = QHBoxLayout()
+        ok_btn = QPushButton("OK")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(ok_btn)
+        buttons_layout.addWidget(cancel_btn)
+        layout.addLayout(buttons_layout)
+        
+        self.setLayout(layout)
+    
+    def get_selected_indices(self) -> list[int]:
+        """Get the indices of selected fields."""
+        return [i for i, checkbox in enumerate(self.field_checkboxes) if checkbox.isChecked()]
+
+
+class FieldMergingDialog(QDialog):
+    """Dialog to configure field merging for filename fields."""
+    
+    def __init__(self, field_names: list[str], existing_merge_groups: list[list[int]], parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setWindowTitle("Configure Field Merging")
+        self.setModal(True)
+        self.resize(600, 500)
+        
+        self.field_names = field_names
+        self.merge_groups = [group.copy() for group in existing_merge_groups]  # Deep copy
+        
+        layout = QVBoxLayout()
+        
+        # Header
+        header_label = QLabel("Field Merging Configuration")
+        header_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(header_label)
+        
+        info_label = QLabel("Define which fields should be merged together in the metrics table.\n"
+                           "Example: Merge 'Subject' + 'Treatment' to create 'Subject_Treatment' column.")
+        info_label.setStyleSheet("color: #666; margin-bottom: 15px;")
+        layout.addWidget(info_label)
+        
+        # Merge groups configuration
+        merge_group = QGroupBox("Merge Groups")
+        merge_layout = QVBoxLayout()
+        
+        self.merge_list = QListWidget()
+        self.merge_list.setMaximumHeight(200)
+        self.merge_list.setStyleSheet("QListWidget::item { height: 40px; padding: 5px; }")
+        merge_layout.addWidget(self.merge_list)
+        
+        # Buttons for managing merge groups
+        buttons_layout = QHBoxLayout()
+        self.add_merge_btn = QPushButton("Add Merge Group")
+        self.add_merge_btn.clicked.connect(self.add_merge_group)
+        self.remove_merge_btn = QPushButton("Remove Selected")
+        self.remove_merge_btn.clicked.connect(self.remove_merge_group)
+        self.clear_all_btn = QPushButton("Clear All")
+        self.clear_all_btn.clicked.connect(self.clear_all_groups)
+        
+        buttons_layout.addWidget(self.add_merge_btn)
+        buttons_layout.addWidget(self.remove_merge_btn)
+        buttons_layout.addWidget(self.clear_all_btn)
+        buttons_layout.addStretch()
+        merge_layout.addLayout(buttons_layout)
+        
+        merge_group.setLayout(merge_layout)
+        layout.addWidget(merge_group)
+        
+        # Dialog buttons
+        dialog_buttons_layout = QHBoxLayout()
+        ok_btn = QPushButton("OK")
+        ok_btn.clicked.connect(self.accept)
+        ok_btn.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; padding: 8px 16px; border-radius: 4px; }")
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        cancel_btn.setStyleSheet("QPushButton { padding: 8px 16px; border-radius: 4px; }")
+        
+        dialog_buttons_layout.addStretch()
+        dialog_buttons_layout.addWidget(ok_btn)
+        dialog_buttons_layout.addWidget(cancel_btn)
+        layout.addLayout(dialog_buttons_layout)
+        
+        self.setLayout(layout)
+        
+        # Initialize display
+        self.update_merge_display()
+    
+    def add_merge_group(self) -> None:
+        """Add a new merge group."""
+        if len(self.field_names) < 2:
+            QMessageBox.warning(self, "Warning", "Need at least 2 fields to create a merge group.")
+            return
+        
+        dialog = MergeGroupDialog(self.field_names, self)
+        if dialog.exec_() == QDialog.Accepted:
+            selected_indices = dialog.get_selected_indices()
+            if len(selected_indices) < 2:
+                QMessageBox.warning(self, "Warning", "Please select at least 2 fields to merge.")
+                return
+            
+            # Check for overlapping merge groups
+            for existing_group in self.merge_groups:
+                if any(idx in existing_group for idx in selected_indices):
+                    QMessageBox.warning(self, "Warning", 
+                        "One or more selected fields are already in another merge group. "
+                        "Each field can only be in one merge group.")
+                    return
+            
+            self.merge_groups.append(selected_indices)
+            self.update_merge_display()
+    
+    def remove_merge_group(self) -> None:
+        """Remove the selected merge group."""
+        current_row = self.merge_list.currentRow()
+        if current_row >= 0 and current_row < len(self.merge_groups):
+            self.merge_groups.pop(current_row)
+            self.update_merge_display()
+    
+    def clear_all_groups(self) -> None:
+        """Clear all merge groups."""
+        if self.merge_groups:
+            reply = QMessageBox.question(self, "Confirm Clear", 
+                "Are you sure you want to remove all merge groups?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.merge_groups = []
+                self.update_merge_display()
+    
+    def update_merge_display(self) -> None:
+        """Update the merge groups display."""
+        self.merge_list.clear()
+        
+        for i, group in enumerate(self.merge_groups):
+            group_names = [self.field_names[idx] for idx in group if idx < len(self.field_names)]
+            merge_name = " + ".join(group_names)
+            result_name = "_".join(group_names)
+            display_text = f"Group {i+1}: {merge_name} → {result_name}"
+            self.merge_list.addItem(display_text)
+    
+    def get_merge_groups(self) -> list[list[int]]:
+        """Get the configured merge groups."""
+        return [group.copy() for group in self.merge_groups]
 
 
 class CreateProjectDialog(QDialog):
@@ -61,11 +232,13 @@ class CreateProjectDialog(QDialog):
         folder_layout = QHBoxLayout()
         self.folder_field = QLineEdit()
         self.folder_field.setReadOnly(True)
+        self.folder_field.setFixedHeight(40)  # Match button height
         folder_layout.addWidget(self.folder_field)
         btn_select_folder = QPushButton("Select Folder")
-        btn_select_folder.setFixedSize(120, 30)
+        btn_select_folder.setFixedSize(120, 40)  # Match field height
         btn_select_folder.clicked.connect(self.select_folder)
         folder_layout.addWidget(btn_select_folder)
+        folder_layout.setAlignment(QtCore.AlignmentFlag.AlignCenter)  # Center both horizontally and vertically
         layout.addWidget(QLabel("Source Folder:"))
         layout.addLayout(folder_layout)
 
@@ -89,7 +262,25 @@ class CreateProjectDialog(QDialog):
         filename_layout.addWidget(QLabel("Field Names:"))
         self.field_names_list = QListWidget()
         self.field_names_list.setMaximumHeight(200)
+        # Set list item height for better visibility
+        self.field_names_list.setStyleSheet("QListWidget::item { height: 50px; }")
         filename_layout.addWidget(self.field_names_list)
+        
+        # Field merging configuration button
+        merge_button_layout = QHBoxLayout()
+        self.configure_merging_btn = QPushButton("Configure Field Merging...")
+        self.configure_merging_btn.clicked.connect(self.open_field_merging_dialog)
+        self.configure_merging_btn.setFixedHeight(40)
+        self.configure_merging_btn.setStyleSheet("QPushButton { padding: 10px; }")
+        merge_button_layout.addWidget(self.configure_merging_btn)
+        #merge_button_layout.addStretch()
+        filename_layout.addLayout(merge_button_layout)
+        filename_layout.addSpacing(10)
+        
+        # Merge status display
+        self.merge_status_label = QLabel("No field merging configured")
+        self.merge_status_label.setStyleSheet("color: #888; font-style: italic; padding: 5px;")
+        filename_layout.addWidget(self.merge_status_label)
         
         # Preview area
         filename_layout.addWidget(QLabel("Filename Validation Preview:"))
@@ -122,11 +313,79 @@ class CreateProjectDialog(QDialog):
 
         self.setLayout(layout)
 
+        # Initialize merge groups first
+        self.merge_groups = []  # List of lists, each containing field indices that should be merged
+
         # Initialize field names
         self.update_field_names()
         
         # Initial validation (in case fields have default text)
         self.validate()
+
+    def open_field_merging_dialog(self) -> None:
+        """Open the field merging configuration dialog."""
+        field_names = self.get_field_names()
+        if len(field_names) < 2:
+            QMessageBox.warning(self, "Warning", "Need at least 2 fields to configure field merging.")
+            return
+        
+        dialog = FieldMergingDialog(field_names, self.merge_groups, self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.merge_groups = dialog.get_merge_groups()
+            self.update_merge_status_display()
+
+    def update_merge_status_display(self) -> None:
+        """Update the merge status display."""
+        if not self.merge_groups:
+            self.merge_status_label.setText("No field merging configured")
+            self.merge_status_label.setStyleSheet("color: #888; font-style: italic; padding: 5px;")
+        else:
+            field_names = self.get_field_names()
+            status_text = f"Field merging configured ({len(self.merge_groups)} group{'s' if len(self.merge_groups) > 1 else ''}):\n"
+            
+            for i, group in enumerate(self.merge_groups):
+                group_names = [field_names[idx] for idx in group if idx < len(field_names)]
+                merge_name = " + ".join(group_names)
+                status_text += f"  Group {i+1}: {merge_name}\n"
+            
+            self.merge_status_label.setText(status_text.strip())
+            self.merge_status_label.setStyleSheet("color: #4CAF50; padding: 5px; font-weight: bold;")
+
+    def get_merge_groups(self) -> list:
+        """Get the current merge groups configuration."""
+        return self.merge_groups.copy()
+
+    def apply_merge_groups(self, field_names: list[str], field_values: list[str]) -> tuple[list[str], list[str]]:
+        """Apply merge groups to field names and values."""
+        if not self.merge_groups:
+            return field_names, field_values
+        
+        # Create sets to track which indices are merged
+        merged_indices = set()
+        for group in self.merge_groups:
+            merged_indices.update(group)
+        
+        merged_field_names = []
+        merged_values = []
+        
+        # Add merged groups first
+        for group in self.merge_groups:
+            group_names = [field_names[i] for i in group if i < len(field_names)]
+            group_values = [field_values[i] for i in group if i < len(field_values)]
+            
+            merged_name = "_".join(group_names)
+            merged_value = "_".join(group_values)
+            
+            merged_field_names.append(merged_name)
+            merged_values.append(merged_value)
+        
+        # Add non-merged fields
+        for i, (name, value) in enumerate(zip(field_names, field_values)):
+            if i not in merged_indices:
+                merged_field_names.append(name)
+                merged_values.append(value)
+        
+        return merged_field_names, merged_values
 
     def update_field_names(self) -> None:
         """Update the field names list based on the number of fields."""
@@ -139,9 +398,16 @@ class CreateProjectDialog(QDialog):
             default_name = default_names[i] if i < len(default_names) else f"field_{i+1}"
             item = QLineEdit(default_name)
             item.textChanged.connect(self.validate)
+            item.textChanged.connect(self.update_merge_status_display)
             self.field_names_list.addItem("")
             self.field_names_list.setItemWidget(self.field_names_list.item(i), item)
         
+        # Clear merge groups if field count changed significantly
+        max_field_idx = max([max(group) for group in self.merge_groups] + [-1])
+        if max_field_idx >= num_fields:
+            self.merge_groups = []
+        
+        self.update_merge_status_display()
         self.validate()
 
     def get_field_names(self) -> list[str]:
@@ -202,8 +468,18 @@ class CreateProjectDialog(QDialog):
                     name_without_ext = os.path.splitext(example_file)[0]
                     parts = name_without_ext.split('_')
                     result_text += f"\n\nExample parsing ({example_file}):\n"
+                    
+                    # Show both original fields and merged fields
+                    result_text += "Original fields:\n"
                     for field_name, value in zip(field_names, parts):
                         result_text += f"  {field_name}: {value}\n"
+                    
+                    # Show merged fields if any
+                    if self.merge_groups:
+                        result_text += "\nAfter merging:\n"
+                        merged_field_names, merged_values = self.apply_merge_groups(field_names, parts)
+                        for field_name, value in zip(merged_field_names, merged_values):
+                            result_text += f"  {field_name}: {value}\n"
             
             self.preview_text.setText(result_text)
             
@@ -296,6 +572,7 @@ def create_project_folder(dialog: CreateProjectDialog) -> str:
     # Get filename structure info
     expected_fields = dialog.num_fields_spin.value()
     field_names = dialog.get_field_names()
+    merge_groups = dialog.get_merge_groups()
     
     # Video copy to project folder with validation
     source_video_files = [
@@ -365,6 +642,7 @@ def create_project_folder(dialog: CreateProjectDialog) -> str:
         "filename_structure": {
             "num_fields": expected_fields,
             "field_names": field_names,
+            "merge_groups": merge_groups,
             "description": f"Filenames should have {expected_fields} fields separated by '_': " + 
                           " _ ".join(field_names)
         }

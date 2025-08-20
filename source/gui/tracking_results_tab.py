@@ -229,6 +229,9 @@ class TrackingResultsTab(QWidget):
                 border: 1px solid #4a90a4;
             }
         """)
+        
+        image_label_width = image_label.width()
+        image_label_height = image_label.height()
 
         # Center the labels by wrapping them in a widget
         label_container = QWidget()
@@ -330,7 +333,18 @@ class TrackingResultsTab(QWidget):
             if self.image_files and self.parent_window and hasattr(self.parent_window, 'folder_path'):
                 image_path = os.path.join(self.parent_window.folder_path, "images", self.image_files[self.current_image_index])
                 pixmap = QPixmap(image_path)
-                scaled_pixmap = pixmap.scaled(746, 600, Qt.AspectRatioMode.KeepAspectRatio)
+                # Scale image to fit within a reasonable size while maintaining aspect ratio
+                # Use the actual widget size or fallback to reasonable defaults
+                widget_width = image_label_width
+                widget_height = image_label_height
+                
+                
+                scaled_pixmap = pixmap.scaled(
+                    widget_width - 100,  # Leave some margin
+                    widget_height - 100,  # Leave some margin
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
                 image_label.setPixmap(scaled_pixmap)
                 file_label.setText(self.image_files[self.current_image_index])
 

@@ -155,7 +155,7 @@ class ProjectManagementTab(QWidget):
         ):
             field.setReadOnly(True)
             field.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            scaled_height = self.scaling_manager.scale_size(50)
+            scaled_height = self.scaling_manager.scale_size(40)
             if isinstance(scaled_height, tuple):
                 scaled_height = scaled_height[1]
             field.setMinimumHeight(scaled_height)
@@ -180,8 +180,8 @@ class ProjectManagementTab(QWidget):
         # Special formatting for filename structure field
         self.filename_structure.setReadOnly(True)
         self.filename_structure.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        scaled_max_height = self.scaling_manager.scale_size(120)
-        scaled_min_height = self.scaling_manager.scale_size(80)
+        scaled_max_height = self.scaling_manager.scale_size(90)
+        scaled_min_height = self.scaling_manager.scale_size(40)
         if isinstance(scaled_max_height, tuple):
             scaled_max_height = scaled_max_height[1]
         if isinstance(scaled_min_height, tuple):
@@ -207,7 +207,7 @@ class ProjectManagementTab(QWidget):
         """)
 
         yaml_layout = QVBoxLayout()
-        yaml_layout.setSpacing(15)
+        yaml_layout.setSpacing(5)
         
         # Create styled labels
         def create_label(text):
@@ -411,7 +411,18 @@ class ProjectManagementTab(QWidget):
         if filename_structure:
             field_names = filename_structure.get("field_names", [])
             num_fields = filename_structure.get("num_fields", len(field_names))
+            merge_groups = filename_structure.get("merge_groups", [])
+            
             description = filename_structure.get("description", f"{num_fields} fields: " + " _ ".join(field_names))
+            
+            # Add merge groups information if they exist
+            if merge_groups:
+                description += "\n\nField Merging:"
+                for i, group in enumerate(merge_groups):
+                    group_names = [field_names[idx] for idx in group if idx < len(field_names)]
+                    merge_name = " + ".join(group_names)
+                    description += f"\n  Group {i+1}: {merge_name}"
+            
             self.filename_structure.setText(description)
         else:
             self.filename_structure.setText("No filename structure defined")
@@ -466,7 +477,18 @@ class ProjectManagementTab(QWidget):
                 # Display filename structure information
                 field_names = dialog.get_field_names()
                 num_fields = dialog.num_fields_spin.value()
+                merge_groups = dialog.get_merge_groups()
+                
                 description = f"{num_fields} fields: " + " _ ".join(field_names)
+                
+                # Add merge groups information if they exist
+                if merge_groups:
+                    description += "\n\nField Merging:"
+                    for i, group in enumerate(merge_groups):
+                        group_names = [field_names[idx] for idx in group if idx < len(field_names)]
+                        merge_name = " + ".join(group_names)
+                        description += f"\n  Group {i+1}: {merge_name}"
+                
                 self.filename_structure.setText(description)
 
                 # Enable other tabs

@@ -502,6 +502,8 @@ class StatisticalAnalysisTab(QWidget):
                 border: none;
             }
         """)
+        
+        self.results_table.verticalHeader().setVisible(False) # type: ignore
         table_layout.addWidget(self.results_table)
         results_splitter.addWidget(table_group)
         
