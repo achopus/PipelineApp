@@ -26,7 +26,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Pipeline Settings")
         self.setModal(True)
-        self.resize(800, 700)
+        self.resize(1800, 800)
         
         self.project_path = project_path
         

@@ -17,8 +17,9 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QTabWidget,
+    QMenu,
 )
-
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon
 
 # Local application imports
@@ -26,6 +27,7 @@ from file_management.status import Status
 from gui.project_management_tab import ProjectManagementTab
 from gui.scaling import get_scaling_manager
 from gui.settings_dialog import SettingsDialog
+from gui.manual_dialog import show_manual_dialog
 from gui.statistical_analysis_tab import StatisticalAnalysisTab
 from gui.style import get_scaled_dark_style
 from gui.tracking_results_tab import TrackingResultsTab
@@ -143,25 +145,36 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Error setting window icon: {e}")
 
     def create_menu_bar(self) -> None:
-        """Create a menu bar with settings and exit buttons."""
+        """Create a menu bar with manual, settings and exit buttons."""
         # Create menu bar
         self.menubar = self.menuBar()
         if self.menubar is None:
             return
         
-        # Create settings action
+        # Add items in reverse order due to right-to-left layout
+        # This will show as: Manual | Settings | Exit (left to right)
+        
+        # Create exit action (added first, appears rightmost)
+        exit_action = QAction("❌ Exit", self)
+        exit_action.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        exit_action.setStatusTip('Exit application')
+        exit_action.triggered.connect(self.close_application)
+        self.menubar.addAction(exit_action)
+        
+        # Create settings action (added second, appears in middle)
         settings_action = QAction("⚙️ Settings", self)
         settings_action.setFont(QFont("Segoe UI", 12, QFont.Bold))
         settings_action.setStatusTip('Configure pipeline settings')
         settings_action.triggered.connect(self.open_settings)
         self.menubar.addAction(settings_action)
         
-        # Create exit action
-        exit_action = QAction("❌ Exit", self)
-        exit_action.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        exit_action.setStatusTip('Exit application')
-        exit_action.triggered.connect(self.close_application)
-        self.menubar.addAction(exit_action)
+        # Create manual/help menu (added last, appears leftmost)
+        manual_menu = QAction("📖 Manual", self)
+        manual_menu.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        manual_menu.setStatusTip('Access documentation and guides')
+        manual_menu.triggered.connect(lambda: show_manual_dialog(self))
+
+        self.menubar.addAction(manual_menu)
         
         # Style the menu bar with right alignment for the buttons
         self.menubar.setStyleSheet("""
@@ -187,7 +200,29 @@ class MainWindow(QMainWindow):
             QMenuBar::item:pressed {
                 background-color: #26a69a;
             }
+            QMenu {
+                background-color: #2b2b2b;
+                color: #f0f0f0;
+                border: 1px solid #4dd0e1;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QMenu::item {
+                background-color: transparent;
+                padding: 8px 16px;
+                margin: 1px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #4dd0e1;
+                color: white;
+            }
+            QMenu::item:pressed {
+                background-color: #26a69a;
+            }
         """)
+        # Set menu bar to layout right-to-left
+        self.menubar.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
     def open_settings(self) -> None:
         """Open the settings dialog."""
