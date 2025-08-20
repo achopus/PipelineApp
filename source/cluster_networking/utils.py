@@ -5,6 +5,8 @@ Utility functions for cluster networking operations.
 import os
 from dotenv import load_dotenv
 
+from utils.settings_manager import get_settings_manager
+
 
 def convert_to_linux_path(windows_path: str) -> str:
     """
@@ -22,8 +24,10 @@ def convert_to_linux_path(windows_path: str) -> str:
     if not windows_path:
         raise ValueError("Path cannot be empty")
         
-    load_dotenv()
-    cluster_base = os.getenv("CLUSTER_BASE_PATH", "/proj/BV_data/")
+    # Get cluster base path from settings
+    settings_manager = get_settings_manager()
+    settings = settings_manager.get_all_settings()
+    cluster_base = settings.get("cluster_base_path", "/proj/BV_data/")
     
     # Normalize and convert backslashes to forward slashes
     linux_path = os.path.normpath(windows_path).replace("\\", "/")

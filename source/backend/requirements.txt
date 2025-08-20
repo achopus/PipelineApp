@@ -1,0 +1,24 @@
+# Backend requirements for PipelineApp cluster processing
+
+# Core dependencies
+numpy>=1.24.0
+pathlib2>=2.3.7
+
+# Video processing and computer vision
+opencv-python>=4.8.0
+
+# Deep learning and pose estimation
+deeplabcut>=2.3.0
+tensorflow>=2.10.0
+
+# Optional: For GPU support (uncomment if using CUDA)
+# tensorflow-gpu>=2.10.0
+
+# Development and testing (optional)
+# pytest>=7.0.0
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.0.0
+
+# System utilities for argument parsing
+argparse  # Built-in, but listed for completeness

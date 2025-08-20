@@ -6,10 +6,12 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import paramiko
 from dotenv import load_dotenv
+
+from utils.settings_manager import get_settings_manager
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -27,60 +29,66 @@ class SLURMJobError(Exception):
 
 def validate_ssh_config() -> Tuple[str, int, str, str]:
     """
-    Validate and return SSH configuration from environment variables.
+    Validate and return SSH configuration from settings.
     
     Returns:
         Tuple of (host, port, username, password)
         
     Raises:
-        ValueError: If required environment variables are missing or invalid
+        ValueError: If required settings are missing or invalid
     """
-    load_dotenv()
+    settings_manager = get_settings_manager()
+    settings = settings_manager.get_all_settings()
     
-    host = os.getenv("SSH_HOST")
+    # Get SSH settings from settings manager
+    host = settings.get("ssh_host")
     if not host:
-        raise ValueError("SSH_HOST environment variable is required")
+        raise ValueError("SSH host is not configured in settings")
     
-    try:
-        port = int(os.getenv("SSH_PORT", "22"))
-    except ValueError:
-        raise ValueError("SSH_PORT must be a valid integer")
+    port = settings.get("ssh_port", 22)
+    if not isinstance(port, int) or port <= 0 or port > 65535:
+        raise ValueError("SSH port must be a valid port number (1-65535)")
     
-    username = os.getenv("SSH_USER")
+    username = settings.get("ssh_user")
     if not username:
-        raise ValueError("SSH_USER environment variable is required")
+        raise ValueError("SSH user is not configured in settings")
     
+    # Try to get password from environment first (for security), fallback to settings
+    load_dotenv()
     password = os.getenv("SSH_PASS")
     if not password:
-        raise ValueError("SSH_PASS environment variable is required")
+        password = settings.get("ssh_password", "")
+        if not password:
+            raise ValueError("SSH password is not configured. Set SSH_PASS environment variable or configure in settings")
     
     return host, port, username, password
 
 
 def get_cluster_paths() -> Tuple[str, str, str]:
     """
-    Get cluster-specific paths from environment variables.
+    Get cluster-specific paths from settings.
     
     Returns:
         Tuple of (base_path, home_path, conda_env)
     """
-    load_dotenv()
+    settings_manager = get_settings_manager()
+    settings = settings_manager.get_all_settings()
     
-    base_path = os.getenv("CLUSTER_BASE_PATH", "/proj/BV_data/")
-    home_path = os.getenv("CLUSTER_HOME_PATH", "/home/vojtech.brejtr")
-    conda_env = os.getenv("CLUSTER_CONDA_ENV", "DLC")
+    base_path = settings.get("cluster_base_path", "/proj/BV_data/")
+    home_path = settings.get("cluster_home_path", "/home/vojtech.brejtr")
+    conda_env = settings.get("cluster_conda_env", "DLC")
     
     return base_path, home_path, conda_env
 
 
-def ssh_send_command(commands: List[str], max_retries: int = 3, retry_delay: float = 5.0) -> bool:
+def ssh_send_command(commands: List[str], max_retries: Optional[int] = None, retry_delay: Optional[float] = None) -> bool:
     """
     Connect to remote host via SSH and send commands with retry logic.
     
     Args:
         commands: List of commands to execute on the remote host
-        max_retries: Maximum number of connection attempts
-        retry_delay: Delay between retry attempts in seconds
+        max_retries: Maximum number of connection attempts (if None, uses settings)
+        retry_delay: Delay between retry attempts in seconds (if None, uses settings)
         
     Returns:
         bool: True if all commands were sent successfully, False otherwise
@@ -88,6 +96,20 @@ def ssh_send_command(commands: List[str], max_retries: int = 3, retry_delay: flo
     if not commands:
         logger.warning("No commands to send")
         return True
+    
+    # Get retry settings from settings manager if not provided
+    if max_retries is None or retry_delay is None:
+        settings_manager = get_settings_manager()
+        settings = settings_manager.get_all_settings()
+        
+        if max_retries is None:
+            max_retries = settings.get("ssh_max_retries", 3)
+        if retry_delay is None:
+            retry_delay = settings.get("ssh_retry_delay", 5.0)
+    
+    # Ensure we have valid values
+    assert max_retries is not None
+    assert retry_delay is not None
     
     try:
         host, port, username, password = validate_ssh_config()
@@ -174,13 +196,30 @@ def slurm_text_preprocessing(videos: List[str], keypoints: List[str], target_fol
     """
     _, home_path, conda_env = get_cluster_paths()
     
+    # Get SLURM settings from settings manager
+    settings_manager = get_settings_manager()
+    settings = settings_manager.get_all_settings()
+    
+    cpus = settings.get("slurm_preprocessing_cpus", 1)
+    memory = settings.get("slurm_preprocessing_memory", "8gb")
+    time_limit = settings.get("slurm_preprocessing_time", "1-00:00:00")
+    partition = settings.get("slurm_preprocessing_partition", "")
+    
+    # Get backend preprocessing settings
+    boundary = settings.get("preprocessing_boundary", 100)
+    output_width = settings.get("preprocessing_output_width", 1000)
+    output_height = settings.get("preprocessing_output_height", 1000)
+    
     def generate_text(video_file: str, corners: str) -> str:
+        partition_line = f"#SBATCH --partition={partition}" if partition else ""
+        
         return f"""#!/bin/bash
 #SBATCH --job-name=PRC_BehaviorPipeline_Preprocessing_{Path(video_file).name}
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=8gb
-#SBATCH --time=1-00:00:00
+#SBATCH --cpus-per-task={cpus}
+#SBATCH --mem={memory}
+#SBATCH --time={time_limit}
+{partition_line}
 #SBATCH --output={home_path}/pipelines/app_preprocessing/logs_preprocessing/preprocessing_%j.log
 
 module load Miniforge3/24.9.0-0
@@ -191,7 +230,7 @@ kinit vojtech.brejtr@PCP.LF3.CUNI.CZ < {home_path}/Desktop/log
 
 cd {home_path}/pipelines/app_preprocessing/
 
-python preprocessing.py --video_path {video_file} --corners '{corners}' --folder_out {target_folder}
+python preprocessing.py --video_path {video_file} --corners '{corners}' --folder_out {target_folder} --boundary {boundary} --output_width {output_width} --output_height {output_height}
 """
 
     slurm_texts = [generate_text(v, k) for v, k in zip(videos, keypoints)]
@@ -211,14 +250,32 @@ def slurm_text_tracking(videos: List[str], target_folder: str) -> List[str]:
     """
     _, home_path, conda_env = get_cluster_paths()
     
+    # Get SLURM settings from settings manager
+    settings_manager = get_settings_manager()
+    settings = settings_manager.get_all_settings()
+    
+    cpus = settings.get("slurm_tracking_cpus", 4)
+    memory = settings.get("slurm_tracking_memory", "16gb")
+    time_limit = settings.get("slurm_tracking_time", "1-00:00:00")
+    partition = settings.get("slurm_tracking_partition", "PipelineProdGPU")
+    
+    # Get DLC backend settings
+    config_path = settings.get("dlc_config_path", "/home/vojtech.brejtr/projects/DLC_Basler/NPS-Basler-2025-02-19/config.yaml")
+    video_type = settings.get("dlc_video_type", ".mp4")
+    shuffle = settings.get("dlc_shuffle", 1)
+    batch_size = settings.get("dlc_batch_size", 16)
+    save_as_csv = settings.get("dlc_save_as_csv", True)
+    
     def generate_text(video_file: str) -> str:
+        partition_line = f"#SBATCH --partition={partition}" if partition else ""
+        
         return f"""#!/bin/bash
 #SBATCH --job-name=PRC_BehaviorPipeline_Tracking_{Path(video_file).name}
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --partition=PipelineProdGPU
-#SBATCH --mem=16gb
-#SBATCH --time=1-00:00:00
+#SBATCH --cpus-per-task={cpus}
+{partition_line}
+#SBATCH --mem={memory}
+#SBATCH --time={time_limit}
 #SBATCH --output={home_path}/pipelines/app_preprocessing/logs_tracking/tracking_%j.log
 
 module load Miniforge3/24.9.0-0
@@ -229,7 +286,7 @@ kinit vojtech.brejtr@PCP.LF3.CUNI.CZ < {home_path}/Desktop/log
 
 cd {home_path}/pipelines/app_preprocessing/
 
-python extract_pose.py --video_path {video_file} --out_folder {target_folder} > /dev/null 2>&1
+python extract_pose.py --config_path {config_path} --video_path {video_file} --video_type {video_type} --out_folder {target_folder} --shuffle {shuffle} --batch_size {batch_size} --save_as_csv {"1" if save_as_csv else "0"} > /dev/null 2>&1
 """
         
     slurm_texts = [generate_text(v) for v in videos]

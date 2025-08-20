@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QDoubleSpinBox, QSpinBox, QGroupBox, QGridLayout,
     QPushButton, QMessageBox, QCheckBox, QComboBox, QTextEdit,
-    QScrollArea, QFormLayout
+    QScrollArea, QFormLayout, QLineEdit
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -26,7 +26,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Pipeline Settings")
         self.setModal(True)
-        self.resize(1800, 800)
+        self.resize(1900, 800)
         
         self.project_path = project_path
         
@@ -79,15 +79,64 @@ class SettingsDialog(QDialog):
             # Cluster removal
             "cluster_removal_enabled": True,
             "min_cluster_size_seconds": 1.0,
-            "cluster_padding_factor": 0.2  # Was cluster_size // 5, now 20% of cluster size
+            "cluster_padding_factor": 0.2,  # Was cluster_size // 5, now 20% of cluster size
+            
+            # Cluster/SSH Settings
+            "ssh_host": "sup200.ad.nudz.cz",
+            "ssh_port": 22,
+            "ssh_user": "pcp\\vojtech.brejtr",
+            "ssh_password": "",  # Will be loaded from .env
+            "ssh_max_retries": 3,
+            "ssh_retry_delay": 5.0,
+            
+            # Cluster Paths
+            "cluster_base_path": "/proj/BV_data/",
+            "cluster_home_path": "/home/vojtech.brejtr",
+            "cluster_conda_env": "DLC",
+            
+            # SLURM Preprocessing Settings
+            "slurm_preprocessing_cpus": 1,
+            "slurm_preprocessing_memory": "8gb",
+            "slurm_preprocessing_time": "1-00:00:00",
+            "slurm_preprocessing_partition": "",  # Default partition
+            
+            # SLURM Tracking Settings
+            "slurm_tracking_cpus": 4,
+            "slurm_tracking_memory": "16gb",
+            "slurm_tracking_time": "1-00:00:00",
+            "slurm_tracking_partition": "PipelineProdGPU",
+            
+            # Backend Processing Settings
+            "dlc_config_path": "/home/vojtech.brejtr/projects/DLC_Basler/NPS-Basler-2025-02-19/config.yaml",
+            "dlc_video_type": ".mp4",
+            "dlc_shuffle": 1,
+            "dlc_batch_size": 16,
+            "dlc_save_as_csv": True,
+            
+            # Video Preprocessing Settings
+            "preprocessing_boundary": 100,
+            "preprocessing_output_width": 1000,
+            "preprocessing_output_height": 1000
         }
     
     def setup_ui(self) -> None:
         """Setup the user interface."""
         layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
         
         # Create tab widget
         self.tab_widget = QTabWidget()
+        self.tab_widget.setTabPosition(QTabWidget.North)
+        
+        # Set tab bar style to match main window
+        self.tab_widget.setStyleSheet("""
+            QTabBar::tab {
+                min-width: 250px;
+                padding: 10px;
+                font-size: 12pt;
+            }
+        """)
         
         # Arena and General tab
         self.create_arena_tab()
@@ -103,6 +152,9 @@ class SettingsDialog(QDialog):
         
         # Advanced tab
         self.create_advanced_tab()
+        
+        # Cluster Settings tab
+        self.create_cluster_tab()
         
         layout.addWidget(self.tab_widget)
         
@@ -368,6 +420,190 @@ class SettingsDialog(QDialog):
         tab.setLayout(layout)
         self.tab_widget.addTab(tab, "Advanced")
     
+    def create_cluster_tab(self) -> None:
+        """Create the cluster settings tab."""
+        tab = QWidget()
+        main_layout = QVBoxLayout()
+        
+        # Warning message at the top
+        warning_label = QLabel("⚠️ WARNING: Changing these settings may result in errors or failed cluster operations.\n"
+                              "Only modify these settings if you understand their impact on cluster processing.")
+        warning_label.setStyleSheet("""
+            QLabel {
+                background-color: #fff3cd;
+                border: 1px solid #ffeaa7;
+                color: #856404;
+                padding: 10px;
+                border-radius: 5px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+        """)
+        warning_label.setWordWrap(True)
+        main_layout.addWidget(warning_label)
+        
+        # Create scroll area for the content
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        
+        scroll_widget = QWidget()
+        layout = QVBoxLayout(scroll_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(15)
+        
+        # SSH Connection Settings and Cluster Paths in a horizontal layout
+        connection_layout = QHBoxLayout()
+        
+        # SSH Connection Settings
+        ssh_group = QGroupBox("SSH Connection Settings")
+        ssh_layout = QFormLayout()
+        
+        self.ssh_host = QLineEdit()
+        ssh_layout.addRow("SSH Host:", self.ssh_host)
+        
+        self.ssh_port = QSpinBox()
+        self.ssh_port.setRange(1, 65535)
+        ssh_layout.addRow("SSH Port:", self.ssh_port)
+        
+        self.ssh_user = QLineEdit()
+        ssh_layout.addRow("SSH User:", self.ssh_user)
+        
+        self.ssh_max_retries = QSpinBox()
+        self.ssh_max_retries.setRange(1, 10)
+        self.ssh_max_retries.setMaximumWidth(100)
+        ssh_layout.addRow("Max Retries:", self.ssh_max_retries)
+        
+        self.ssh_retry_delay = QDoubleSpinBox()
+        self.ssh_retry_delay.setRange(1.0, 60.0)
+        self.ssh_retry_delay.setSuffix(" seconds")
+        ssh_layout.addRow("Retry Delay:", self.ssh_retry_delay)
+        
+        ssh_group.setLayout(ssh_layout)
+        connection_layout.addWidget(ssh_group)
+        
+        # Cluster Paths Settings
+        paths_group = QGroupBox("Cluster Paths")
+        paths_layout = QFormLayout()
+        
+        self.cluster_base_path = QLineEdit()
+        paths_layout.addRow("Base Path:", self.cluster_base_path)
+        
+        self.cluster_home_path = QLineEdit()
+        paths_layout.addRow("Home Path:", self.cluster_home_path)
+        
+        self.cluster_conda_env = QLineEdit()
+        paths_layout.addRow("Conda Environment:", self.cluster_conda_env)
+        
+        paths_group.setLayout(paths_layout)
+        connection_layout.addWidget(paths_group)
+        
+        layout.addLayout(connection_layout)
+        
+        # SLURM Settings in a horizontal layout
+        slurm_layout = QHBoxLayout()
+        
+        # SLURM Preprocessing Settings
+        slurm_prep_group = QGroupBox("SLURM Preprocessing Settings")
+        slurm_prep_layout = QFormLayout()
+        
+        self.slurm_preprocessing_cpus = QSpinBox()
+        self.slurm_preprocessing_cpus.setRange(1, 32)
+        slurm_prep_layout.addRow("CPUs per Task:", self.slurm_preprocessing_cpus)
+        
+        self.slurm_preprocessing_memory = QLineEdit()
+        slurm_prep_layout.addRow("Memory (e.g., 8gb):", self.slurm_preprocessing_memory)
+        
+        self.slurm_preprocessing_time = QLineEdit()
+        slurm_prep_layout.addRow("Time Limit:", self.slurm_preprocessing_time)
+        
+        self.slurm_preprocessing_partition = QLineEdit()
+        slurm_prep_layout.addRow("Partition (optional):", self.slurm_preprocessing_partition)
+        
+        slurm_prep_group.setLayout(slurm_prep_layout)
+        slurm_layout.addWidget(slurm_prep_group)
+        
+        # SLURM Tracking Settings
+        slurm_track_group = QGroupBox("SLURM Tracking Settings")
+        slurm_track_layout = QFormLayout()
+        
+        self.slurm_tracking_cpus = QSpinBox()
+        self.slurm_tracking_cpus.setRange(1, 32)
+        slurm_track_layout.addRow("CPUs per Task:", self.slurm_tracking_cpus)
+        
+        self.slurm_tracking_memory = QLineEdit()
+        slurm_track_layout.addRow("Memory (e.g., 16gb):", self.slurm_tracking_memory)
+        
+        self.slurm_tracking_time = QLineEdit()
+        slurm_track_layout.addRow("Time Limit:", self.slurm_tracking_time)
+        
+        self.slurm_tracking_partition = QLineEdit()
+        slurm_track_layout.addRow("Partition:", self.slurm_tracking_partition)
+        
+        slurm_track_group.setLayout(slurm_track_layout)
+        slurm_layout.addWidget(slurm_track_group)
+        
+        layout.addLayout(slurm_layout)
+        
+        # Backend Settings in a horizontal layout
+        backend_layout = QHBoxLayout()
+        
+        # DeepLabCut Settings
+        dlc_group = QGroupBox("DeepLabCut Backend Settings")
+        dlc_layout = QFormLayout()
+        
+        self.dlc_config_path = QLineEdit()
+        dlc_layout.addRow("Config Path:", self.dlc_config_path)
+        
+        self.dlc_video_type = QComboBox()
+        self.dlc_video_type.addItems([".mp4", ".avi", ".mov", ".mkv"])
+        dlc_layout.addRow("Video Type:", self.dlc_video_type)
+        
+        self.dlc_shuffle = QSpinBox()
+        self.dlc_shuffle.setRange(1, 10)
+        dlc_layout.addRow("Shuffle:", self.dlc_shuffle)
+        
+        self.dlc_batch_size = QSpinBox()
+        self.dlc_batch_size.setRange(1, 128)
+        dlc_layout.addRow("Batch Size:", self.dlc_batch_size)
+        
+        self.dlc_save_as_csv = QCheckBox("Save as CSV")
+        dlc_layout.addRow("Output Format:", self.dlc_save_as_csv)
+        
+        dlc_group.setLayout(dlc_layout)
+        backend_layout.addWidget(dlc_group)
+        
+        # Video Preprocessing Settings
+        preproc_group = QGroupBox("Video Preprocessing Settings")
+        preproc_layout = QFormLayout()
+        
+        self.preprocessing_boundary = QSpinBox()
+        self.preprocessing_boundary.setRange(0, 500)
+        self.preprocessing_boundary.setSuffix(" pixels")
+        preproc_layout.addRow("Boundary Padding:", self.preprocessing_boundary)
+        
+        self.preprocessing_output_width = QSpinBox()
+        self.preprocessing_output_width.setRange(100, 5000)
+        self.preprocessing_output_width.setSuffix(" pixels")
+        preproc_layout.addRow("Output Width:", self.preprocessing_output_width)
+        
+        self.preprocessing_output_height = QSpinBox()
+        self.preprocessing_output_height.setRange(100, 5000)
+        self.preprocessing_output_height.setSuffix(" pixels")
+        preproc_layout.addRow("Output Height:", self.preprocessing_output_height)
+        
+        preproc_group.setLayout(preproc_layout)
+        backend_layout.addWidget(preproc_group)
+        
+        layout.addLayout(backend_layout)
+        
+        # Set up scroll area
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
+        main_layout.addWidget(scroll_area)
+        
+        tab.setLayout(main_layout)
+        self.tab_widget.addTab(tab, "Cluster Settings")
+    
     def on_body_size_mode_changed(self) -> None:
         """Handle body size mode change."""
         is_manual = self.body_size_mode.currentIndex() == 1
@@ -422,6 +658,37 @@ class SettingsDialog(QDialog):
         self.min_cluster_size_seconds.setValue(self.current_settings["min_cluster_size_seconds"])
         self.cluster_padding_factor.setValue(self.current_settings["cluster_padding_factor"])
         
+        # Cluster settings - use .get() with defaults to handle missing keys
+        self.ssh_host.setText(self.current_settings.get("ssh_host", self.default_settings["ssh_host"]))
+        self.ssh_port.setValue(self.current_settings.get("ssh_port", self.default_settings["ssh_port"]))
+        self.ssh_user.setText(self.current_settings.get("ssh_user", self.default_settings["ssh_user"]))
+        self.ssh_max_retries.setValue(self.current_settings.get("ssh_max_retries", self.default_settings["ssh_max_retries"]))
+        self.ssh_retry_delay.setValue(self.current_settings.get("ssh_retry_delay", self.default_settings["ssh_retry_delay"]))
+        
+        self.cluster_base_path.setText(self.current_settings.get("cluster_base_path", self.default_settings["cluster_base_path"]))
+        self.cluster_home_path.setText(self.current_settings.get("cluster_home_path", self.default_settings["cluster_home_path"]))
+        self.cluster_conda_env.setText(self.current_settings.get("cluster_conda_env", self.default_settings["cluster_conda_env"]))
+        
+        self.slurm_preprocessing_cpus.setValue(self.current_settings.get("slurm_preprocessing_cpus", self.default_settings["slurm_preprocessing_cpus"]))
+        self.slurm_preprocessing_memory.setText(self.current_settings.get("slurm_preprocessing_memory", self.default_settings["slurm_preprocessing_memory"]))
+        self.slurm_preprocessing_time.setText(self.current_settings.get("slurm_preprocessing_time", self.default_settings["slurm_preprocessing_time"]))
+        self.slurm_preprocessing_partition.setText(self.current_settings.get("slurm_preprocessing_partition", self.default_settings["slurm_preprocessing_partition"]))
+        
+        self.slurm_tracking_cpus.setValue(self.current_settings.get("slurm_tracking_cpus", self.default_settings["slurm_tracking_cpus"]))
+        self.slurm_tracking_memory.setText(self.current_settings.get("slurm_tracking_memory", self.default_settings["slurm_tracking_memory"]))
+        self.slurm_tracking_time.setText(self.current_settings.get("slurm_tracking_time", self.default_settings["slurm_tracking_time"]))
+        self.slurm_tracking_partition.setText(self.current_settings.get("slurm_tracking_partition", self.default_settings["slurm_tracking_partition"]))
+        
+        self.dlc_config_path.setText(self.current_settings.get("dlc_config_path", self.default_settings["dlc_config_path"]))
+        self.dlc_video_type.setCurrentText(self.current_settings.get("dlc_video_type", self.default_settings["dlc_video_type"]))
+        self.dlc_shuffle.setValue(self.current_settings.get("dlc_shuffle", self.default_settings["dlc_shuffle"]))
+        self.dlc_batch_size.setValue(self.current_settings.get("dlc_batch_size", self.default_settings["dlc_batch_size"]))
+        self.dlc_save_as_csv.setChecked(self.current_settings.get("dlc_save_as_csv", self.default_settings["dlc_save_as_csv"]))
+        
+        self.preprocessing_boundary.setValue(self.current_settings.get("preprocessing_boundary", self.default_settings["preprocessing_boundary"]))
+        self.preprocessing_output_width.setValue(self.current_settings.get("preprocessing_output_width", self.default_settings["preprocessing_output_width"]))
+        self.preprocessing_output_height.setValue(self.current_settings.get("preprocessing_output_height", self.default_settings["preprocessing_output_height"]))
+        
         # Update enabled states
         self.on_body_size_mode_changed()
         self.on_head_size_mode_changed()
@@ -458,7 +725,43 @@ class SettingsDialog(QDialog):
             # Advanced
             "cluster_removal_enabled": self.cluster_removal_enabled.isChecked(),
             "min_cluster_size_seconds": self.min_cluster_size_seconds.value(),
-            "cluster_padding_factor": self.cluster_padding_factor.value()
+            "cluster_padding_factor": self.cluster_padding_factor.value(),
+            
+            # Cluster/SSH Settings
+            "ssh_host": self.ssh_host.text(),
+            "ssh_port": self.ssh_port.value(),
+            "ssh_user": self.ssh_user.text(),
+            "ssh_max_retries": self.ssh_max_retries.value(),
+            "ssh_retry_delay": self.ssh_retry_delay.value(),
+            
+            # Cluster Paths
+            "cluster_base_path": self.cluster_base_path.text(),
+            "cluster_home_path": self.cluster_home_path.text(),
+            "cluster_conda_env": self.cluster_conda_env.text(),
+            
+            # SLURM Preprocessing Settings
+            "slurm_preprocessing_cpus": self.slurm_preprocessing_cpus.value(),
+            "slurm_preprocessing_memory": self.slurm_preprocessing_memory.text(),
+            "slurm_preprocessing_time": self.slurm_preprocessing_time.text(),
+            "slurm_preprocessing_partition": self.slurm_preprocessing_partition.text(),
+            
+            # SLURM Tracking Settings
+            "slurm_tracking_cpus": self.slurm_tracking_cpus.value(),
+            "slurm_tracking_memory": self.slurm_tracking_memory.text(),
+            "slurm_tracking_time": self.slurm_tracking_time.text(),
+            "slurm_tracking_partition": self.slurm_tracking_partition.text(),
+            
+            # Backend Processing Settings
+            "dlc_config_path": self.dlc_config_path.text(),
+            "dlc_video_type": self.dlc_video_type.currentText(),
+            "dlc_shuffle": self.dlc_shuffle.value(),
+            "dlc_batch_size": self.dlc_batch_size.value(),
+            "dlc_save_as_csv": self.dlc_save_as_csv.isChecked(),
+            
+            # Video Preprocessing Settings
+            "preprocessing_boundary": self.preprocessing_boundary.value(),
+            "preprocessing_output_width": self.preprocessing_output_width.value(),
+            "preprocessing_output_height": self.preprocessing_output_height.value()
         }
     
     def reset_to_defaults(self) -> None:
