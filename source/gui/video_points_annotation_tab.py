@@ -15,7 +15,10 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from PyQt5.QtCore import QDateTime
+
 from cluster_networking.preprocessing import cluster_preprocessing
+from cluster_networking.expected_runtime import preprocessing_runtime
 from gui.scaling import get_scaling_manager
 from gui.video_points_widget import VideoPointsWidget
 
@@ -110,10 +113,14 @@ class VideoPointsAnnotationTab(QWidget):
             if self.parent_window and hasattr(self.parent_window, 'yaml_path'):
                 success_flag = cluster_preprocessing(self.parent_window.yaml_path)
                 if success_flag:
+                    videos = [os.path.join(self.parent_window.folder_path, "videos", f) for f in os.listdir(os.path.join(self.parent_window.folder_path, "videos")) if f.endswith((".mp4", ".avi", ".mov"))]
+                    expected_runtime = preprocessing_runtime(videos)
+                    now_time = QDateTime.currentDateTime()
+                    finish_time = now_time.addSecs(int(expected_runtime))
                     QMessageBox.information(
                         self,
                         "Preprocessing Status",
-                        "Sending all annotated videos to cluster for preprocessing."
+                        f"Sending all annotated videos to cluster for preprocessing.\nProcessing is expected to finish at {finish_time.toString()}"
                     )
                 else:
                     QMessageBox.warning(

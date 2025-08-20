@@ -14,7 +14,6 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
-    QDialog,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -28,9 +27,6 @@ from PyQt5.QtWidgets import (
 )
 
 from cluster_networking.tracking import cluster_tracking
-from file_management.status import Status
-from metric_calculation.metrics_pipeline import run_metrics_pipeline
-from metric_calculation.utils import construct_metric_dataframe
 
 
 class TrackingResultsTab(QWidget):
