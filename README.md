@@ -150,7 +150,7 @@ video annotation to metrics calculation with cluster computing suppor
 - **One-way ANOVA**: Compare behavioral metrics across multiple groups
   - F-statistics and p-values
   - Degrees of freedom
-  - Post-hoc comparisons (planned)
+  - Post-hoc comparisons
 
 - **Two-way ANOVA**: Analyze interaction effects between two factors
   - Main effects for each factor
