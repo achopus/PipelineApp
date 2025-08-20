@@ -246,7 +246,7 @@ class CreateProjectDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Create New Project")
         self.setModal(True)
-        self.resize(800, 1000)
+        self.resize(1200, 1000)
 
         layout = QVBoxLayout()
 

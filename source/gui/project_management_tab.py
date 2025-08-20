@@ -10,7 +10,7 @@ from typing import Dict, Optional
 import pandas as pd
 import yaml
 from pandas import DataFrame
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QtWidgets import (
     QAbstractItemView,
@@ -432,8 +432,51 @@ class ProjectManagementTab(QWidget):
         self.btn_create_project.setVisible(False)
         
         # Defer heavy UI operations to prevent flashing
-        from PyQt5.QtCore import QTimer
         QTimer.singleShot(50, self._complete_yaml_loading)
+
+    def load_project_from_path(self, project_path: str) -> None:
+        """Load a project from a specific YAML file path."""
+        if not os.path.exists(project_path):
+            return
+        
+        try:
+            with open(project_path, "r") as f:
+                data = yaml.safe_load(f)
+                
+            self.yaml_path = project_path
+            self.folder_path = os.path.dirname(project_path)
+            
+            # Update parent window attributes
+            if self.parent_window:
+                self.parent_window.yaml_path = self.yaml_path
+                self.parent_window.folder_path = self.folder_path
+            
+            metrics_dataframe_path = os.path.join(self.folder_path, "results", "metrics_dataframe.csv")
+            if os.path.exists(metrics_dataframe_path):
+                self.metrics_dataframe = pd.read_csv(metrics_dataframe_path)
+                if self.parent_window:
+                    self.parent_window.metrics_dataframe = self.metrics_dataframe
+
+            # Update UI fields first
+            self.project_name.setText(data.get("project_name", ""))
+            self.experiment_description.setText(data.get("experiment_description", ""))
+            
+            # Handle filename_fields
+            filename_fields = data.get("filename_fields", [])
+            if isinstance(filename_fields, list) and filename_fields:
+                description = f"{len(filename_fields)} fields: " + " _ ".join(filename_fields)
+                self.filename_structure.setText(description)
+            
+            # Hide buttons immediately
+            self.btn_load_yaml.setVisible(False)
+            self.btn_create_project.setVisible(False)
+            
+            # Defer heavy UI operations to prevent flashing
+            QTimer.singleShot(50, self._complete_yaml_loading)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error Loading Project", 
+                               f"Failed to load project from {project_path}:\n{str(e)}")
 
     def _complete_yaml_loading(self) -> None:
         """Complete the YAML loading process with deferred UI operations."""
@@ -451,6 +494,10 @@ class ProjectManagementTab(QWidget):
             # Enable statistical analysis tab if we have metrics data
             if self.metrics_dataframe is not None:
                 self.parent_window.enable_statistical_analysis_tab()
+            
+            # Add to recent projects
+            if self.yaml_path and hasattr(self.parent_window, 'add_to_recent_projects'):
+                self.parent_window.add_to_recent_projects(self.yaml_path)
 
     def create_project(self) -> None:
         """Create a new project using the project creation dialog."""
@@ -497,6 +544,10 @@ class ProjectManagementTab(QWidget):
                     self.parent_window.tabs.setTabEnabled(1, True)
                     self.parent_window.enable_video_points_tab()
                     self.parent_window.enable_tracking_tab()
+                    
+                    # Add to recent projects
+                    if self.yaml_path and hasattr(self.parent_window, 'add_to_recent_projects'):
+                        self.parent_window.add_to_recent_projects(self.yaml_path)
                     
             except (ValueError, RuntimeError) as e:
                 QMessageBox.critical(self, "Error", f"Failed to create project:\n{str(e)}")

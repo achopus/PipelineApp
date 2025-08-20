@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QTabWidget,
     QMenu,
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSettings
 from PyQt5.QtGui import QFont, QIcon
 
 # Local application imports
@@ -105,6 +105,11 @@ class MainWindow(QMainWindow):
         self.video_widget = None
         self.metric_worker: Optional[MetricCalculationWorker] = None
 
+        # Initialize settings for recent projects
+        self.settings = QSettings("PipelineApp", "MainWindow")
+        self.recent_projects_menu: Optional[QMenu] = None
+        self.recent_projects_actions: list = []
+
         # Set up the tab widget
         self.tabs = QTabWidget()
         self.tabs.setTabPosition(QTabWidget.North)
@@ -186,14 +191,14 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Error setting window icon: {e}")
 
     def create_menu_bar(self) -> None:
-        """Create a menu bar with manual, settings and exit buttons."""
+        """Create a menu bar with manual, recent projects, settings and exit buttons."""
         # Create menu bar
         self.menubar = self.menuBar()
         if self.menubar is None:
             return
         
         # Add items in reverse order due to right-to-left layout
-        # This will show as: Manual | Settings | Exit (left to right)
+        # This will show as: Manual | Recent Projects | Settings | Exit (left to right)
         
         # Create exit action (added first, appears rightmost)
         exit_action = QAction("❌ Exit", self)
@@ -208,6 +213,13 @@ class MainWindow(QMainWindow):
         settings_action.setStatusTip('Configure pipeline settings')
         settings_action.triggered.connect(self.open_settings)
         self.menubar.addAction(settings_action)
+        
+        # Create recent projects menu (added third)
+        self.recent_projects_menu = QMenu("📁 Recent Projects", self)
+        self.recent_projects_menu.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        self.recent_projects_menu.setStatusTip('Open recently used projects')
+        self.menubar.addMenu(self.recent_projects_menu)
+        self.update_recent_projects_menu()
         
         # Create manual/help menu (added last, appears leftmost)
         manual_menu = QAction("📖 Manual", self)
@@ -264,6 +276,96 @@ class MainWindow(QMainWindow):
         """)
         # Set menu bar to layout right-to-left
         self.menubar.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+
+    def update_recent_projects_menu(self) -> None:
+        """Update the recent projects menu with saved projects."""
+        if not self.recent_projects_menu:
+            return
+            
+        # Clear existing actions
+        self.recent_projects_menu.clear()
+        self.recent_projects_actions.clear()
+        
+        # Get recent projects from settings
+        recent_projects = self.settings.value("recent_projects", [], type=list)
+        
+        if not recent_projects:
+            # Add "No recent projects" item
+            no_projects_action = QAction("No recent projects", self)
+            no_projects_action.setEnabled(False)
+            self.recent_projects_menu.addAction(no_projects_action)
+            return
+        
+        # Add each recent project
+        for i, project_path in enumerate(recent_projects[:10]):  # Limit to 10 most recent
+            if os.path.exists(project_path):
+                project_name = os.path.basename(os.path.dirname(project_path))
+                action = QAction(f"{i+1}. {project_name}", self)
+                action.setStatusTip(f"Open project: {project_path}")
+                action.triggered.connect(lambda checked, path=project_path: self.load_recent_project(path))
+                self.recent_projects_menu.addAction(action)
+                self.recent_projects_actions.append(action)
+        
+        # Add separator and clear recent projects option
+        if recent_projects:
+            self.recent_projects_menu.addSeparator()
+            clear_action = QAction("Clear Recent Projects", self)
+            clear_action.triggered.connect(self.clear_recent_projects)
+            self.recent_projects_menu.addAction(clear_action)
+
+    def add_to_recent_projects(self, project_path: str) -> None:
+        """Add a project to the recent projects list."""
+        if not project_path or not os.path.exists(project_path):
+            return
+            
+        # Get current recent projects
+        recent_projects = self.settings.value("recent_projects", [], type=list)
+        
+        # Remove if already exists (to move to top)
+        if project_path in recent_projects:
+            recent_projects.remove(project_path)
+        
+        # Add to beginning
+        recent_projects.insert(0, project_path)
+        
+        # Limit to 10 recent projects
+        recent_projects = recent_projects[:10]
+        
+        # Save back to settings
+        self.settings.setValue("recent_projects", recent_projects)
+        
+        # Update menu
+        self.update_recent_projects_menu()
+
+    def load_recent_project(self, project_path: str) -> None:
+        """Load a project from the recent projects list."""
+        if not os.path.exists(project_path):
+            QMessageBox.warning(self, "Project Not Found", 
+                              f"The project file no longer exists:\n{project_path}")
+            # Remove from recent projects
+            recent_projects = self.settings.value("recent_projects", [], type=list)
+            if project_path in recent_projects:
+                recent_projects.remove(project_path)
+                self.settings.setValue("recent_projects", recent_projects)
+                self.update_recent_projects_menu()
+            return
+        
+        # Load the project using the project management tab's new method
+        self.project_management_tab.load_project_from_path(project_path)
+        
+        # Add to recent projects (moves to top)
+        self.add_to_recent_projects(project_path)
+
+    def clear_recent_projects(self) -> None:
+        """Clear the recent projects list."""
+        reply = QMessageBox.question(self, "Clear Recent Projects", 
+                                   "Are you sure you want to clear all recent projects?",
+                                   QMessageBox.Yes | QMessageBox.No, 
+                                   QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            self.settings.setValue("recent_projects", [])
+            self.update_recent_projects_menu()
 
     def open_settings(self) -> None:
         """Open the settings dialog."""
