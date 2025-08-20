@@ -233,32 +233,166 @@ QScrollBar:vertical {{
     background-color: #3c3f41;
     width: {int(16 * scaling_manager.scale_factor)}px;
     border-radius: 8px;
+    border: 1px solid #555;
+    margin: 0px;
 }}
 
 QScrollBar::handle:vertical {{
-    background-color: #666;
-    border-radius: 8px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #6a6a6a, stop:0.5 #777, stop:1 #666);
+    border: 1px solid #888;
+    border-radius: 6px;
     min-height: {int(20 * scaling_manager.scale_factor)}px;
+    margin: 2px;
 }}
 
 QScrollBar::handle:vertical:hover {{
-    background-color: #777;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #7a7a7a, stop:0.5 #888, stop:1 #777);
+    border: 1px solid #999;
+}}
+
+QScrollBar::handle:vertical:pressed {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #4a90e2, stop:0.5 #357abd, stop:1 #4a90e2);
+    border: 1px solid #4a90e2;
+}}
+
+QScrollBar::add-line:vertical {{
+    background-color: #3c3f41;
+    height: {int(16 * scaling_manager.scale_factor)}px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    subcontrol-position: bottom;
+    subcontrol-origin: margin;
+}}
+
+QScrollBar::add-line:vertical:hover {{
+    background-color: #4a4a4a;
+}}
+
+QScrollBar::add-line:vertical:pressed {{
+    background-color: #4a90e2;
+}}
+
+QScrollBar::sub-line:vertical {{
+    background-color: #3c3f41;
+    height: {int(16 * scaling_manager.scale_factor)}px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    subcontrol-position: top;
+    subcontrol-origin: margin;
+}}
+
+QScrollBar::sub-line:vertical:hover {{
+    background-color: #4a4a4a;
+}}
+
+QScrollBar::sub-line:vertical:pressed {{
+    background-color: #4a90e2;
+}}
+
+QScrollBar::up-arrow:vertical {{
+    border: none;
+    width: {int(8 * scaling_manager.scale_factor)}px;
+    height: {int(8 * scaling_manager.scale_factor)}px;
+    background: transparent;
+    image: none;
+}}
+
+QScrollBar::down-arrow:vertical {{
+    border: none;
+    width: {int(8 * scaling_manager.scale_factor)}px;
+    height: {int(8 * scaling_manager.scale_factor)}px;
+    background: transparent;
+    image: none;
+}}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: transparent;
 }}
 
 QScrollBar:horizontal {{
     background-color: #3c3f41;
     height: {int(16 * scaling_manager.scale_factor)}px;
     border-radius: 8px;
+    border: 1px solid #555;
+    margin: 0px;
 }}
 
 QScrollBar::handle:horizontal {{
-    background-color: #666;
-    border-radius: 8px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #6a6a6a, stop:0.5 #777, stop:1 #666);
+    border: 1px solid #888;
+    border-radius: 6px;
     min-width: {int(20 * scaling_manager.scale_factor)}px;
+    margin: 2px;
 }}
 
 QScrollBar::handle:horizontal:hover {{
-    background-color: #777;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #7a7a7a, stop:0.5 #888, stop:1 #777);
+    border: 1px solid #999;
+}}
+
+QScrollBar::handle:horizontal:pressed {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #4a90e2, stop:0.5 #357abd, stop:1 #4a90e2);
+    border: 1px solid #4a90e2;
+}}
+
+QScrollBar::add-line:horizontal {{
+    background-color: #3c3f41;
+    width: {int(16 * scaling_manager.scale_factor)}px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    subcontrol-position: right;
+    subcontrol-origin: margin;
+}}
+
+QScrollBar::add-line:horizontal:hover {{
+    background-color: #4a4a4a;
+}}
+
+QScrollBar::add-line:horizontal:pressed {{
+    background-color: #4a90e2;
+}}
+
+QScrollBar::sub-line:horizontal {{
+    background-color: #3c3f41;
+    width: {int(16 * scaling_manager.scale_factor)}px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    subcontrol-position: left;
+    subcontrol-origin: margin;
+}}
+
+QScrollBar::sub-line:horizontal:hover {{
+    background-color: #4a4a4a;
+}}
+
+QScrollBar::sub-line:horizontal:pressed {{
+    background-color: #4a90e2;
+}}
+
+QScrollBar::left-arrow:horizontal {{
+    border: none;
+    width: {int(8 * scaling_manager.scale_factor)}px;
+    height: {int(8 * scaling_manager.scale_factor)}px;
+    background: transparent;
+    image: none;
+}}
+
+QScrollBar::right-arrow:horizontal {{
+    border: none;
+    width: {int(8 * scaling_manager.scale_factor)}px;
+    height: {int(8 * scaling_manager.scale_factor)}px;
+    background: transparent;
+    image: none;
+}}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+    background: transparent;
 }}
 """
 
