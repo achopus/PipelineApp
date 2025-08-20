@@ -1,7 +1,7 @@
 # PipelineApp - Video Tracking Pipeline
 
-A comprehensive PyQt5-based GUI application for automated behavioral analysis of animal experiments, specifically designed for Open Field Test (OFT) and Elevated Plus Maze (EPM) paradigms. The application provides an end-to-end pipeline from video annotation to metrics calculation with cluster computing support.
-
+A comprehensive PyQt5-based GUI application for automated behavioral analysis of animal experiments, specifically designed for Open Field Test (OFT) and Elevated Plus Maze (EPM) paradigms. The application provides an end-to-end pipeline from t.
+video annotation to metrics calculation with cluster computing suppor
 ## 🎯 Features
 
 ### **Project Management**

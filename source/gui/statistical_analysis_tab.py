@@ -14,6 +14,7 @@ try:
     import statsmodels.api as sm
     from statsmodels.formula.api import ols
     from statsmodels.stats.anova import anova_lm
+    from statsmodels.stats.multicomp import pairwise_tukeyhsd
     STATSMODELS_AVAILABLE = True
 except ImportError:
     STATSMODELS_AVAILABLE = False
@@ -131,6 +132,43 @@ class StatisticalAnalysisWorker(QThread):
                                 'df_between': len(valid_groups) - 1,
                                 'df_within': sum(len(group) for group in valid_groups) - len(valid_groups)
                             }
+                            
+                            # Add Tukey's HSD if ANOVA is significant and statsmodels is available
+                            if p_value < 0.05 and STATSMODELS_AVAILABLE and len(valid_groups) > 2:
+                                try:
+                                    # Prepare data for Tukey's test
+                                    tukey_data = []
+                                    tukey_groups = []
+                                    
+                                    for group_name, group_data in zip(group_names, group_values):
+                                        if len(group_data) > 0:
+                                            tukey_data.extend(group_data)
+                                            tukey_groups.extend([group_name] * len(group_data))
+                                    
+                                    # Perform Tukey's HSD
+                                    tukey_result = pairwise_tukeyhsd(endog=tukey_data, groups=tukey_groups, alpha=0.05)
+                                    
+                                    # Extract pairwise comparisons using summary method
+                                    tukey_summary = []
+                                    tukey_table = tukey_result.summary().data[1:]  # Skip header row
+                                    
+                                    for row in tukey_table:
+                                        if len(row) >= 6:  # Ensure we have all columns
+                                            tukey_summary.append({
+                                                'group1': str(row[0]),
+                                                'group2': str(row[1]),
+                                                'meandiff': float(row[2]),
+                                                'p_adj': float(row[3]),
+                                                'lower': float(row[4]),
+                                                'upper': float(row[5]),
+                                                'significant': str(row[6]).lower() in ['true', 'reject']
+                                            })
+                                    
+                                    test_results['tukey_hsd'] = tukey_summary
+                                    
+                                except Exception as tukey_error:
+                                    test_results['tukey_error'] = f'Tukey HSD failed: {str(tukey_error)}'
+                            
                         except Exception as e:
                             test_results = {'error': f'ANOVA failed: {str(e)}'}
                 
@@ -356,7 +394,7 @@ class StatisticalAnalysisTab(QWidget):
         self.test_type_combo.currentTextChanged.connect(self.on_test_type_changed)
         test_layout.addWidget(self.test_type_combo)
 
-        self.test_info_label = QLabel("t-test: Compare 2 groups\nOne-way ANOVA: Compare 2+ groups\nTwo-way ANOVA: Analyze interaction between 2 factors")
+        self.test_info_label = QLabel("t-test: Compare 2 groups\nOne-way ANOVA: Compare 2+ groups (includes Tukey HSD if significant)\nTwo-way ANOVA: Analyze interaction between 2 factors")
         self.test_info_label.setStyleSheet("color: #888; font-size: 9pt;")
         test_layout.addWidget(self.test_info_label)
         
@@ -487,8 +525,11 @@ class StatisticalAnalysisTab(QWidget):
             "5. Run analysis\n\n"
             f"📊 Statistical tests available:\n"
             f"• t-test: Compare means between 2 groups\n"
-            f"• ANOVA: Compare means between 2+ groups\n\n"
-            f"⚠️ Note: SciPy is {'available' if SCIPY_AVAILABLE else 'NOT available'} for statistical tests."
+            f"• One-way ANOVA: Compare means between 2+ groups\n"
+            f"  (includes Tukey HSD post-hoc test if significant)\n"
+            f"• Two-way ANOVA: Analyze interaction between 2 factors\n\n"
+            f"⚠️ Note: SciPy is {'available' if SCIPY_AVAILABLE else 'NOT available'} for statistical tests.\n"
+            f"⚠️ Note: Statsmodels is {'available' if STATSMODELS_AVAILABLE else 'NOT available'} for advanced tests."
         )
         
         # Set the panel as the widget for the scroll area
@@ -855,6 +896,26 @@ class StatisticalAnalysisTab(QWidget):
                     df_within = test_results['df_within']
                     summary_text += f"  • df: {df_between}, {df_within}\n"
                 
+                # Display Tukey HSD results if available
+                if 'tukey_hsd' in test_results:
+                    tukey_results = test_results['tukey_hsd']
+                    summary_text += f"\n  🔍 Tukey HSD Post-hoc Test:\n"
+                    for comparison in tukey_results:
+                        group1 = comparison['group1']
+                        group2 = comparison['group2']
+                        meandiff = comparison['meandiff']
+                        p_adj = comparison['p_adj']
+                        significant = comparison['significant']
+                        lower = comparison['lower']
+                        upper = comparison['upper']
+                        
+                        sig_text = "***" if significant else "ns"
+                        summary_text += f"    • {group1} vs {group2}: diff={meandiff:.3f}, p_adj={p_adj:.4f} {sig_text}\n"
+                        summary_text += f"      95% CI: [{lower:.3f}, {upper:.3f}]\n"
+                
+                if 'tukey_error' in test_results:
+                    summary_text += f"\n  ⚠️ Tukey HSD Error: {test_results['tukey_error']}\n"
+                
                 # Additional info for Two-way ANOVA
                 if test_results.get('test_type') == 'Two-way ANOVA':
                     factor1 = test_results.get('factor1', '')
@@ -1037,13 +1098,15 @@ class StatisticalAnalysisTab(QWidget):
             # Export text summary
             text_path = os.path.join(results_folder, "statistical_analysis_summary.txt")
             if self.results_text:
-                with open(text_path, 'w') as f:
+                with open(text_path, 'w', encoding='utf-8') as f:
                     f.write(self.results_text.toPlainText())
             
             # Export detailed results as CSV
             csv_path = os.path.join(results_folder, "statistical_analysis_detailed.csv")
             
             detailed_data = []
+            tukey_data = []
+            
             for metric, result in self.current_results.items():
                 if 'error' in result:
                     continue
@@ -1054,20 +1117,64 @@ class StatisticalAnalysisTab(QWidget):
                 if 'error' in test_results:
                     continue
                 
-                row = {'Metric': metric}
-                row.update(descriptive)
-                row.update(test_results)
+                # Create base row with metric info
+                row: Dict[str, Any] = {'Metric': metric}
+                
+                # Add descriptive statistics
+                for key, value in descriptive.items():
+                    row[key] = value
+                
+                # Add test results (excluding complex nested structures)
+                for key, value in test_results.items():
+                    if key in ['tukey_hsd', 'descriptive_2way']:
+                        continue  # Handle these separately
+                    else:
+                        row[key] = value
+                
                 detailed_data.append(row)
+                
+                # Handle Tukey HSD results separately
+                if 'tukey_hsd' in test_results:
+                    tukey_results = test_results['tukey_hsd']
+                    for comparison in tukey_results:
+                        tukey_row = {
+                            'Metric': metric,
+                            'Comparison_Type': 'Tukey_HSD',
+                            'Group1': comparison['group1'],
+                            'Group2': comparison['group2'],
+                            'Mean_Difference': comparison['meandiff'],
+                            'P_Adjusted': comparison['p_adj'],
+                            'Lower_CI': comparison['lower'],
+                            'Upper_CI': comparison['upper'],
+                            'Significant': comparison['significant']
+                        }
+                        tukey_data.append(tukey_row)
             
+            # Export main results
             if detailed_data:
                 df_export = pd.DataFrame(detailed_data)
                 df_export.to_csv(csv_path, index=False)
             
+            # Export Tukey results if available
+            tukey_path = os.path.join(results_folder, "tukey_hsd_results.csv")
+            if tukey_data:
+                df_tukey = pd.DataFrame(tukey_data)
+                df_tukey.to_csv(tukey_path, index=False)
+            
+            # Create export summary message
+            export_files = [f"• {text_path}"]
+            if detailed_data:
+                export_files.append(f"• {csv_path}")
+            if tukey_data:
+                export_files.append(f"• {tukey_path}")
+            
             QMessageBox.information(self, "Export Complete", 
-                f"Results exported to:\n• {text_path}\n• {csv_path}")
+                f"Results exported to:\n" + "\n".join(export_files))
             
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to export results: {str(e)}")
+            import traceback
+            print(f"Export error traceback: {traceback.format_exc()}")
     
     def refresh_data(self) -> None:
         """Refresh data from the parent window if available."""
