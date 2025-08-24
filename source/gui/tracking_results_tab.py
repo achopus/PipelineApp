@@ -303,6 +303,7 @@ class TrackingResultsTab(QWidget):
         self.metrics_table = QTableWidget()
         self.metrics_table.setColumnCount(1)
         self.metrics_table.setHorizontalHeaderLabels(["Metrics will be shown here once the computation is done."])
+        self.metrics_table.setColumnWidth(0, 500)
         vertical_header = self.metrics_table.verticalHeader()
         if vertical_header is not None:
             vertical_header.setVisible(False)
@@ -366,7 +367,7 @@ class TrackingResultsTab(QWidget):
         def run_tracking():
             """Start the tracking process."""
             if self.parent_window and hasattr(self.parent_window, 'yaml_path'):
-                videos = [os.path.join(v) for v in os.listdir(os.path.join(self.parent_window.folder_path, "videos_preprocessed")) if self.parent_window.status[v] == Status.READY_TRACKING]
+                videos = [os.path.join(self.parent_window.folder_path, "videos_preprocessed", v) for v in os.listdir(os.path.join(self.parent_window.folder_path, "videos_preprocessed")) if self.parent_window.status[Path(v).stem] == Status.READY_TRACKING]
                 expected_runtime = tracking_runtime(videos)
                 finish_time = datetime.now() + timedelta(seconds=expected_runtime)
                 QMessageBox.information(

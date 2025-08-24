@@ -81,7 +81,7 @@ def get_cluster_paths() -> Tuple[str, str, str]:
     return base_path, home_path, conda_env
 
 
-def ssh_send_command(commands: List[str], max_retries: Optional[int] = None, retry_delay: Optional[float] = None) -> bool:
+def ssh_send_command(commands: List[str] | str, max_retries: Optional[int] = None, retry_delay: Optional[float] = None) -> bool:
     """
     Connect to remote host via SSH and send commands with retry logic.
     
@@ -97,6 +97,9 @@ def ssh_send_command(commands: List[str], max_retries: Optional[int] = None, ret
         logger.warning("No commands to send")
         return True
     
+    if type(commands) is str:        
+        commands = [commands]
+
     # Get retry settings from settings manager if not provided
     if max_retries is None or retry_delay is None:
         settings_manager = get_settings_manager()
@@ -226,7 +229,7 @@ module load Miniforge3/24.9.0-0
 source /cvmfs/sys.sw.nudz/software/Miniforge3/24.9.0-0/bin/activate
 conda activate {conda_env}
 
-kinit vojtech.brejtr@PCP.LF3.CUNI.CZ < {home_path}/Desktop/log
+kinit -r 168h vojtech.brejtr@PCP.LF3.CUNI.CZ < {home_path}/Desktop/log
 
 cd {home_path}/pipelines/app_preprocessing/
 
@@ -237,17 +240,11 @@ python preprocessing.py --video_path {video_file} --corners '{corners}' --folder
     return slurm_texts
 
 
-def slurm_text_tracking(videos: List[str], target_folder: str) -> List[str]:
-    """
-    Generate SLURM job scripts for video tracking.
-    
-    Args:
-        videos: List of video file paths
-        target_folder: Output folder for tracking results
-        
-    Returns:
-        List of SLURM job script texts
-    """
+def slurm_text_tracking(videos: List[str], target_folder: str, max_concurrent: int = 4) -> List[str]:
+    chunks = [[] for _ in range(max_concurrent)]
+    for i, video in enumerate(videos):
+        chunks[i % max_concurrent].append(video)
+
     _, home_path, conda_env = get_cluster_paths()
     
     # Get SLURM settings from settings manager
@@ -266,28 +263,30 @@ def slurm_text_tracking(videos: List[str], target_folder: str) -> List[str]:
     batch_size = settings.get("dlc_batch_size", 16)
     save_as_csv = settings.get("dlc_save_as_csv", True)
     
-    def generate_text(video_file: str) -> str:
-        partition_line = f"#SBATCH --partition={partition}" if partition else ""
-        
-        return f"""#!/bin/bash
-#SBATCH --job-name=PRC_BehaviorPipeline_Tracking_{Path(video_file).name}
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task={cpus}
-{partition_line}
-#SBATCH --mem={memory}
-#SBATCH --time={time_limit}
-#SBATCH --output={home_path}/pipelines/app_preprocessing/logs_tracking/tracking_%j.log
+    partition_line = f"#SBATCH --partition={partition}" if partition else ""
+    
+    def generate_text(chunk: List[str]) -> str:
+        return f"""
+            #!/bin/bash
+            #SBATCH --job-name=PRC_BehaviorPipeline_Tracking
+            # #SBATCH --ntasks=1
+            #SBATCH --cpus-per-task={cpus}
+            #SBATCH --gres=gpu:1
+            {partition_line}
+            #SBATCH --mem={memory}
+            #SBATCH --time={time_limit}
+            #SBATCH --output={home_path}/pipelines/app_preprocessing/logs_tracking/tracking_array_%A_%a.log
 
-module load Miniforge3/24.9.0-0
-source /cvmfs/sys.sw.nudz/software/Miniforge3/24.9.0-0/bin/activate
-conda activate {conda_env}
+            module load Miniforge3/24.9.0-0
+            source /cvmfs/sys.sw.nudz/software/Miniforge3/24.9.0-0/bin/activate
+            conda activate {conda_env}
 
-kinit vojtech.brejtr@PCP.LF3.CUNI.CZ < {home_path}/Desktop/log
+            kinit -r 168h vojtech.brejtr@PCP.LF3.CUNI.CZ < {home_path}/Desktop/log
 
-cd {home_path}/pipelines/app_preprocessing/
+            cd {home_path}/pipelines/app_preprocessing/
 
-python extract_pose.py --config_path {config_path} --video_path {video_file} --video_type {video_type} --out_folder {target_folder} --shuffle {shuffle} --batch_size {batch_size} --save_as_csv {"1" if save_as_csv else "0"} > /dev/null 2>&1
-"""
-        
-    slurm_texts = [generate_text(v) for v in videos]
-    return slurm_texts
+            python extract_pose.py --config_path {config_path} --video_path '{":::".join(chunk)}' --video_type {video_type} --out_folder {target_folder} --shuffle {shuffle} --batch_size {batch_size} --save_as_csv {"1" if save_as_csv else "0"} > /dev/null 2>&1
+            """
+            
+    commands = [generate_text(chunk) for chunk in chunks if chunk]
+    return commands

@@ -5,8 +5,12 @@ Settings manager for pipeline configuration.
 import json
 import os
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
 
 from gui.style import PROJECT_FOLDER
+
+# Load environment variables
+load_dotenv()
 
 
 class SettingsManager:
@@ -60,7 +64,13 @@ class SettingsManager:
             # Cluster removal
             "cluster_removal_enabled": True,
             "min_cluster_size_seconds": 1.0,
-            "cluster_padding_factor": 0.2  # Was cluster_size // 5, now 20% of cluster size
+            "cluster_padding_factor": 0.2,  # Was cluster_size // 5, now 20% of cluster size
+            
+            ## SSH (loaded from environment variables)
+            "ssh_host": os.getenv("SSH_HOST", "sup200.ad.nudz.cz"),
+            "ssh_port": int(os.getenv("SSH_PORT", "22")),
+            "ssh_user": os.getenv("SSH_USER", ""),
+            "ssh_password": os.getenv("SSH_PASS", "")
         }
     
     def _load_settings(self, project_path: Optional[str] = None) -> None:

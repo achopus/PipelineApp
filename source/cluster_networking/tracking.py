@@ -27,7 +27,7 @@ def tracking_function(project_folder: str, files_to_process: List[str], target_f
         bool: True if commands were sent successfully
     """
     try:
-        commands = slurm_text_tracking(files_to_process, target_folder)
+        commands = slurm_text_tracking(files_to_process, target_folder, max_concurrent=5)
         return ssh_send_command(commands)
     except Exception as e:
         logger.error(f"Error in tracking function: {e}")

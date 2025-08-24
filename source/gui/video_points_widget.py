@@ -398,11 +398,13 @@ class VideoPointsWidget(QWidget):
     def prev_video(self):
         new_index = (self.current_index - 1) % len(self.videos)
         self.load_video(new_index)
+        self.populate_video_list()
 
 
     def next_video(self):
         new_index = (self.current_index + 1) % len(self.videos)
         self.load_video(new_index)
+        self.populate_video_list()
 
 
     def keyPressEvent(self, event):
