@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict
 
 from file_management.status import Status
+from file_management.folders import Folder
 
 
 def check_preprocessing_status(video_path: str) -> Status:
@@ -31,7 +32,7 @@ def check_preprocessing_status(video_path: str) -> Status:
     # Check if video is annotated
     points_path = os.path.join(
         Path(video_path).parent, 
-        'points', 
+        Folder.POINTS.value, 
         Path(video_path).name.replace('.mp4', '.npy')
     )
     is_annotated = os.path.exists(points_path)

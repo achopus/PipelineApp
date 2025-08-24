@@ -29,8 +29,11 @@ from PyQt5.QtWidgets import (
 )
 
 from file_management.status import Status
+from file_management.folders import Folder
 from cluster_networking.tracking import cluster_tracking
 from cluster_networking.expected_runtime import tracking_runtime
+
+from typing import Optional
 
 
 class TrackingResultsTab(QWidget):
@@ -99,7 +102,7 @@ class TrackingResultsTab(QWidget):
         def open_images_folder():
             """Open the images folder in the system file explorer."""
             if self.parent_window and hasattr(self.parent_window, 'folder_path'):
-                images_path = os.path.join(self.parent_window.folder_path, "images")
+                images_path = os.path.join(self.parent_window.folder_path, Folder.IMAGES.value)
                 images_path = images_path.replace("/", "\\")  # Normalize path for cross-platform compatibility
                 if os.path.exists(images_path):
                     if sys.platform == 'win32':
@@ -112,7 +115,7 @@ class TrackingResultsTab(QWidget):
         def open_results_folder():
             """Open the results folder in the system file explorer."""
             if self.parent_window and hasattr(self.parent_window, 'folder_path'):
-                results_path = os.path.join(self.parent_window.folder_path, "results")
+                results_path = os.path.join(self.parent_window.folder_path, Folder.RESULTS.value)
                 results_path = results_path.replace("/", "\\")
                 if os.path.exists(results_path):
                     if sys.platform == 'win32':
@@ -324,7 +327,7 @@ class TrackingResultsTab(QWidget):
         def load_images() -> None:
             """Load images from the images folder."""
             if self.parent_window and hasattr(self.parent_window, 'folder_path'):
-                image_path = os.path.join(self.parent_window.folder_path, "images")
+                image_path = os.path.join(self.parent_window.folder_path, Folder.IMAGES.value)
                 if os.path.exists(image_path):
                     self.image_files = [f for f in os.listdir(image_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
                     show_current_image()
@@ -332,7 +335,7 @@ class TrackingResultsTab(QWidget):
         def show_current_image() -> None:
             """Display the current image in the image viewer."""
             if self.image_files and self.parent_window and hasattr(self.parent_window, 'folder_path'):
-                image_path = os.path.join(self.parent_window.folder_path, "images", self.image_files[self.current_image_index])
+                image_path = os.path.join(self.parent_window.folder_path, Folder.IMAGES.value, self.image_files[self.current_image_index])
                 pixmap = QPixmap(image_path)
                 # Scale image to fit within a reasonable size while maintaining aspect ratio
                 # Use the actual widget size or fallback to reasonable defaults
@@ -367,7 +370,7 @@ class TrackingResultsTab(QWidget):
         def run_tracking():
             """Start the tracking process."""
             if self.parent_window and hasattr(self.parent_window, 'yaml_path'):
-                videos = [os.path.join(self.parent_window.folder_path, "videos_preprocessed", v) for v in os.listdir(os.path.join(self.parent_window.folder_path, "videos_preprocessed")) if self.parent_window.status[Path(v).stem] == Status.READY_TRACKING]
+                videos = [os.path.join(self.parent_window.folder_path, Folder.VIDEOS_PREPROCESSED.value, v) for v in os.listdir(os.path.join(self.parent_window.folder_path, Folder.VIDEOS_PREPROCESSED.value)) if self.parent_window.status[Path(v).stem] == Status.READY_TRACKING]
                 expected_runtime = tracking_runtime(videos)
                 finish_time = datetime.now() + timedelta(seconds=expected_runtime)
                 QMessageBox.information(
@@ -415,7 +418,7 @@ class TrackingResultsTab(QWidget):
     def check_preprocessing_status(self, yaml_path: str) -> None:
         """Check and display the preprocessing status of files."""
         project_folder = os.path.dirname(yaml_path)
-        preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
+        preprocessed_folder = os.path.join(project_folder, Folder.VIDEOS_PREPROCESSED.value)
 
         if not os.path.exists(preprocessed_folder):
             QMessageBox.warning(
@@ -427,9 +430,9 @@ class TrackingResultsTab(QWidget):
 
         completed_files = {Path(f).name for f in os.listdir(preprocessed_folder)}
 
-        files_loaded = os.path.join(project_folder, "videos")
-        files_preprocessed = os.path.join(project_folder, "videos_preprocessed")
-        
+        files_loaded = os.path.join(project_folder, Folder.VIDEOS.value)
+        files_preprocessed = os.path.join(project_folder, Folder.VIDEOS_PREPROCESSED.value)
+
         if len(files_preprocessed):
             files_to_process = [
                 video_source for video_source in files_loaded 

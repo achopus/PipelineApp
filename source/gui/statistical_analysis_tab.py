@@ -27,6 +27,8 @@ from PyQt5.QtWidgets import (
     QCheckBox, QSplitter, QProgressBar, QApplication, QScrollArea
 )
 
+
+
 # Statistical test imports
 try:
     from scipy import stats
@@ -35,6 +37,7 @@ try:
 except ImportError:
     SCIPY_AVAILABLE = False
 
+from file_management.folders import Folder
 from gui.scaling import get_scaling_manager
 
 
@@ -550,7 +553,7 @@ class StatisticalAnalysisTab(QWidget):
             yaml_path = self.parent_window.yaml_path
             
             # Load CSV data
-            csv_path = os.path.join(folder_path, "results", "metrics_dataframe.csv")
+            csv_path = os.path.join(folder_path, Folder.RESULTS.value, "metrics_dataframe.csv")
             if not os.path.exists(csv_path):
                 QMessageBox.warning(self, "Warning", 
                     "No metrics data found. Please run tracking and calculate metrics first.")
@@ -1093,8 +1096,7 @@ class StatisticalAnalysisTab(QWidget):
             if not self.parent_window or not hasattr(self.parent_window, 'folder_path'):
                 QMessageBox.warning(self, "Warning", "No project folder available.")
                 return
-            
-            results_folder = os.path.join(self.parent_window.folder_path, "results")
+            results_folder = os.path.join(self.parent_window.folder_path, Folder.RESULTS.value)
             os.makedirs(results_folder, exist_ok=True)
             
             # Export text summary

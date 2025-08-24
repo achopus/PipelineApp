@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
 
 from PyQt5.QtCore import QDateTime
 
+from file_management.folders import Folder
 from cluster_networking.preprocessing import cluster_preprocessing
 from cluster_networking.expected_runtime import preprocessing_runtime
 from gui.scaling import get_scaling_manager
@@ -98,7 +99,7 @@ class VideoPointsAnnotationTab(QWidget):
             if self.parent_window and hasattr(self.parent_window, 'folder_path'):
                 if self.video_widget is None:
                     self.video_widget = VideoPointsWidget(
-                        os.path.join(self.parent_window.folder_path, "videos")
+                        os.path.join(self.parent_window.folder_path, Folder.VIDEOS.value)
                     )
                     v_layout = QVBoxLayout()
                     v_layout.setContentsMargins(0, 0, 0, 0)
@@ -113,7 +114,7 @@ class VideoPointsAnnotationTab(QWidget):
             if self.parent_window and hasattr(self.parent_window, 'yaml_path'):
                 success_flag = cluster_preprocessing(self.parent_window.yaml_path)
                 if success_flag:
-                    videos = [os.path.join(self.parent_window.folder_path, "videos", f) for f in os.listdir(os.path.join(self.parent_window.folder_path, "videos")) if f.endswith((".mp4", ".avi", ".mov"))]
+                    videos = [os.path.join(self.parent_window.folder_path, Folder.VIDEOS.value, f) for f in os.listdir(os.path.join(self.parent_window.folder_path, Folder.VIDEOS.value)) if f.endswith((".mp4", ".avi", ".mov"))]
                     expected_runtime = preprocessing_runtime(videos)
                     now_time = QDateTime.currentDateTime()
                     finish_time = now_time.addSecs(int(expected_runtime))

@@ -7,7 +7,7 @@ import os
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
-from gui.style import PROJECT_FOLDER
+from file_management.folders import PROJECT_FOLDER
 
 # Load environment variables
 load_dotenv()

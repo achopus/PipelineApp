@@ -6,11 +6,9 @@ import re
 from typing import Optional
 
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
-    QScrollArea, QWidget, QLabel, QTabWidget, QMessageBox
+    QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, QWidget, QLabel, QTabWidget
 )
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QFont, QPixmap, QTextDocument
+from PyQt5.QtCore import Qt
 
 # Import embedded documentation content
 from documentation.readme_content import README_CONTENT

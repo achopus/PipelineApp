@@ -34,9 +34,10 @@ from PyQt5.QtWidgets import (
 
 from file_management.active_file_check import check_folders
 from file_management.status import Status
+from file_management.folders import Folder, PROJECT_FOLDER
 from gui.create_project import CreateProjectDialog, create_project_folder
 from gui.scaling import get_scaling_manager
-from gui.style import PROJECT_FOLDER, STATUS_COLORS
+from gui.style import STATUS_COLORS
 
 
 class ProjectManagementTab(QWidget):
@@ -391,7 +392,7 @@ class ProjectManagementTab(QWidget):
             self.parent_window.yaml_path = self.yaml_path
             self.parent_window.folder_path = self.folder_path
         
-        metrics_dataframe_path = os.path.join(self.folder_path, "results", "metrics_dataframe.csv")
+        metrics_dataframe_path = os.path.join(self.folder_path, Folder.RESULTS.value, "metrics_dataframe.csv")
         if os.path.exists(metrics_dataframe_path):
             self.metrics_dataframe = pd.read_csv(metrics_dataframe_path)
             if self.parent_window:
@@ -510,12 +511,12 @@ class ProjectManagementTab(QWidget):
         if not self.folder_path:
             return
             
-        source_folder = os.path.join(str(self.folder_path), "videos")
-        preprocessing_folder = os.path.join(str(self.folder_path), "videos_preprocessed")
-        tracking_folder = os.path.join(str(self.folder_path), "tracking")
-        points_folder = os.path.join(str(self.folder_path), "points")
-        image_folder = os.path.join(str(self.folder_path), "images")
-        
+        source_folder = os.path.join(str(self.folder_path), Folder.VIDEOS.value)
+        points_folder = os.path.join(str(self.folder_path), Folder.POINTS.value)
+        preprocessing_folder = os.path.join(str(self.folder_path), Folder.VIDEOS_PREPROCESSED.value)
+        tracking_folder = os.path.join(str(self.folder_path), Folder.TRACKING.value)
+        image_folder = os.path.join(str(self.folder_path), Folder.IMAGES.value)
+
         self.status = check_folders(
             source_folder, 
             preprocessing_folder, 

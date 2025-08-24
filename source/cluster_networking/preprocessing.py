@@ -9,6 +9,7 @@ from typing import Callable, List
 from cluster_networking.ssh_handling import slurm_text_preprocessing, ssh_send_command
 from cluster_networking.utils import convert_to_linux_path, validate_directory_exists, validate_file_exists
 from utils.logging_config import get_logger
+from file_management.folders import Folder
 
 logger = get_logger(__name__)
 
@@ -49,10 +50,10 @@ def cluster_preprocessing(yaml_path: str, preprocessing_function: Callable = pre
         return False
         
     project_folder = os.path.dirname(yaml_path)
-    videos_folder = os.path.join(project_folder, "videos")
-    points_folder = os.path.join(project_folder, "points")
-    preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
-    
+    videos_folder = os.path.join(project_folder, Folder.VIDEOS.value)
+    points_folder = os.path.join(project_folder, Folder.POINTS.value)
+    preprocessed_folder = os.path.join(project_folder, Folder.VIDEOS_PREPROCESSED.value)
+
     # Validate required directories exist
     if not validate_directory_exists(videos_folder):
         logger.error(f"Videos folder does not exist: {videos_folder}")

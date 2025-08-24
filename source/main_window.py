@@ -24,6 +24,7 @@ from PyQt5.QtGui import QFont, QIcon
 
 # Local application imports
 from file_management.status import Status
+from file_management.folders import Folder, PROJECT_FOLDER
 from gui.project_management_tab import ProjectManagementTab
 from gui.scaling import get_scaling_manager
 from gui.settings_dialog import SettingsDialog
@@ -61,9 +62,9 @@ class MetricCalculationWorker(QThread):
                 
                 # Run metrics pipeline for this video
                 metrics = run_metrics_pipeline(
-                    frame_path=os.path.join(self.folder_path, "tracking", frame_path),
-                    source_video_path=os.path.join(self.folder_path, "videos", video_path),
-                    save_path=os.path.join(self.folder_path, "images", f"{Path(video_path).stem}.png")
+                    frame_path=os.path.join(self.folder_path, Folder.TRACKING.value, frame_path),
+                    source_video_path=os.path.join(self.folder_path, Folder.VIDEOS.value, video_path),
+                    save_path=os.path.join(self.folder_path, Folder.IMAGES.value, f"{Path(video_path).stem}.png")
                 )
                 
                 # Store results
@@ -365,9 +366,9 @@ class MainWindow(QMainWindow):
         if self.folder_path is None:
             return
             
-        source_videos = os.listdir(os.path.join(self.folder_path, "videos"))
+        source_videos = os.listdir(os.path.join(self.folder_path, Folder.VIDEOS.value))
         trackings = [
-            tr for tr in os.listdir(os.path.join(self.folder_path, "tracking")) 
+            tr for tr in os.listdir(os.path.join(self.folder_path, Folder.TRACKING.value))
             if tr.endswith(".csv")
         ]
         
@@ -427,11 +428,11 @@ class MainWindow(QMainWindow):
         if self.folder_path is not None:
             self.metrics_dataframe = construct_metric_dataframe(self.metrics, self.yaml_path)
             self.metrics_dataframe.to_csv(
-                os.path.join(self.folder_path, "results", "metrics_dataframe.csv"), 
+                os.path.join(self.folder_path, Folder.RESULTS.value, "metrics_dataframe.csv"), 
                 index=False
             )
             self.metrics_dataframe.to_excel(
-                os.path.join(self.folder_path, "results", "metrics_dataframe.xlsx"), 
+                os.path.join(self.folder_path, Folder.RESULTS.value, "metrics_dataframe.xlsx"), 
                 index=False
             )
             self.update_metrics_table()

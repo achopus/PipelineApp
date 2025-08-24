@@ -9,6 +9,7 @@ from typing import Callable, List
 
 from cluster_networking.ssh_handling import slurm_text_tracking, ssh_send_command
 from cluster_networking.utils import convert_to_linux_path, validate_directory_exists, validate_file_exists
+from file_management.folders import Folder
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -50,9 +51,9 @@ def cluster_tracking(yaml_path: str, tracking_function_param: Callable = trackin
         return False
         
     project_folder = os.path.dirname(yaml_path)
-    tracking_folder = os.path.join(project_folder, "tracking")
-    preprocessed_folder = os.path.join(project_folder, "videos_preprocessed")
-    
+    tracking_folder = os.path.join(project_folder, Folder.TRACKING.value)
+    preprocessed_folder = os.path.join(project_folder, Folder.VIDEOS_PREPROCESSED.value)
+
     # Validate required directories exist
     if not validate_directory_exists(preprocessed_folder):
         logger.error(f"Preprocessed videos folder does not exist: {preprocessed_folder}")

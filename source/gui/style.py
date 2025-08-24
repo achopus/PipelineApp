@@ -1,13 +1,7 @@
 """
 GUI styling and constants for the Pipeline Application.
 """
-
-import os
 from PyQt5.QtGui import QColor
-from dotenv import load_dotenv
-
-load_dotenv()
-PROJECT_FOLDER = os.getenv("PROJECT_FOLDER", "//srv-fs.ad.nudz.cz/BV_data/TrackingPRC")
 
 
 def get_scaled_dark_style() -> str:

@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QColor, QGuiApplication
 from PyQt5.QtCore import Qt, QTimer, QPoint
+
+from file_management.folders import Folder
 from gui.scaling import get_scaling_manager
 from utils.logging_config import get_logger
 
@@ -162,8 +164,7 @@ class VideoPointsWidget(QWidget):
         self.setFocus()
 
     def populate_video_list(self, create_new: bool = False):
-        points = [Path(p).stem for p in os.listdir(os.path.join(Path(self.video_folder).parent, 'points'))]
-        # self.video_list.clear()
+        points = [Path(p).stem for p in os.listdir(os.path.join(Path(self.video_folder).parent, Folder.POINTS.value))]
 
         # Set the complete styling for the video list widget
         base_font_size = self.scaling_manager.scale_font_size(10)
@@ -250,7 +251,7 @@ class VideoPointsWidget(QWidget):
             return
 
         points_list = []
-        points_path = os.path.join(Path(video_path).parent.parent, 'points', Path(video_path).name.replace('.mp4', '.npy'))
+        points_path = os.path.join(Path(video_path).parent.parent, Folder.POINTS.value, Path(video_path).name.replace('.mp4', '.npy'))
         if os.path.exists(points_path):
             try:
                 coords = np.load(points_path)
@@ -350,22 +351,6 @@ class VideoPointsWidget(QWidget):
             painter.setPen(pen)
             painter.drawPoint(dx, dy)
 
-        """
-        # Draw video index and filename top-left corner (display coords)
-        painter.setPen(QColor('white'))
-        font = QFont()
-        scaled_font_size = self.scaling_manager.scale_font_size(16)
-        font.setPointSize(scaled_font_size)
-        font.setBold(True)
-        painter.setFont(font)
-
-        text = f"{self.current_index + 1} / {len(self.videos)} : {Path(self.videos[self.current_index]).stem}"
-        text_margin = self.scaling_manager.scale_size(10)
-        if isinstance(text_margin, tuple):
-            text_margin = text_margin[0]
-        painter.drawText(text_margin, scaled_font_size + 10, text)
-
-        """
         painter.end()
 
         self.video_label.setPixmap(pixmap)
@@ -414,7 +399,7 @@ class VideoPointsWidget(QWidget):
             self.points_per_video[self.current_index] = []
             # Remove saved points file if it exists
             video_filepath = self.videos[self.current_index]
-            points_path = os.path.join(Path(self.video_folder).parent, 'points', Path(video_filepath).name.replace('.mp4', '.npy'))
+            points_path = os.path.join(Path(self.video_folder).parent, Folder.POINTS.value, Path(video_filepath).name.replace('.mp4', '.npy'))
             if os.path.exists(points_path):
                 os.remove(points_path)
 
@@ -433,7 +418,7 @@ class VideoPointsWidget(QWidget):
         for idx, point in self.points_per_video.items():
             if len(point) != 4: continue
             video_filepath = self.videos[idx]
-            np.save(os.path.join(Path(self.video_folder).parent, 'points', Path(video_filepath).name.replace('.mp4', '.npy')), np.array([(p.x(), p.y()) for p in point]))
+            np.save(os.path.join(Path(self.video_folder).parent, Folder.POINTS.value, Path(video_filepath).name.replace('.mp4', '.npy')), np.array([(p.x(), p.y()) for p in point]))
 
         # Refresh video list colors
         self.populate_video_list()

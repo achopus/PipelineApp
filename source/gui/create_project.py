@@ -1,4 +1,5 @@
 import os
+import ctypes
 from datetime import datetime
 from typing import Optional
 
@@ -16,18 +17,16 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QWidget,
     QProgressDialog,
-    QApplication,
     QSpinBox,
     QListWidget,
     QMessageBox,
     QGroupBox,
     QTextEdit,
     QCheckBox,
-    QListWidgetItem
 )
 from PyQt5.QtCore import Qt, Qt as QtCore, QThread, pyqtSignal
 
-from gui.style import PROJECT_FOLDER
+from file_management.folders import Folder, PROJECT_FOLDER
 
 
 class FileCopyWorker(QThread):
@@ -605,10 +604,14 @@ def create_project_folder(dialog: CreateProjectDialog) -> str:
     os.mkdir(project_path)
     
     # Subfolder creation
-    subfolders = ['videos', 'points', 'videos_preprocessed', 'tracking', 'results', 'images']
+    subfolders = [Folder.VIDEOS, Folder.POINTS, Folder.VIDEOS_PREPROCESSED, Folder.TRACKING, Folder.RESULTS, Folder.IMAGES]
+    FILE_ATTRIBUTE_HIDDEN = 0x02
     for subfolder in subfolders:
-        os.mkdir(os.path.join(project_path, subfolder))
-        
+        subfolder_path = os.path.join(project_path, subfolder.value)
+        os.mkdir(subfolder_path)
+        if subfolder.value.startswith("."):
+            ctypes.windll.kernel32.SetFileAttributesW(subfolder_path, FILE_ATTRIBUTE_HIDDEN)
+
     # Get filename structure info
     expected_fields = dialog.num_fields_spin.value()
     field_names = dialog.get_field_names()
@@ -646,7 +649,7 @@ def create_project_folder(dialog: CreateProjectDialog) -> str:
         # Use threaded file copying
         success = _copy_files_threaded(
             dialog.folder_field.text(),
-            os.path.join(project_path, 'videos'),
+            os.path.join(project_path, Folder.VIDEOS.value),
             valid_files,
             dialog
         )
