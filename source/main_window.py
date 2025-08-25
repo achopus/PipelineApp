@@ -24,7 +24,7 @@ from PyQt5.QtGui import QFont, QIcon
 
 # Local application imports
 from file_management.status import Status
-from file_management.folders import Folder, PROJECT_FOLDER
+from file_management.folders import Folder
 from gui.project_management_tab import ProjectManagementTab
 from gui.scaling import get_scaling_manager
 from gui.settings_dialog import SettingsDialog
@@ -59,7 +59,7 @@ class MetricCalculationWorker(QThread):
             for i, (video_path, frame_path) in enumerate(self.pairs):
                 # Emit progress update
                 self.progress_update.emit(i, len(self.pairs), video_path)
-                
+
                 # Run metrics pipeline for this video
                 metrics = run_metrics_pipeline(
                     frame_path=os.path.join(self.folder_path, Folder.TRACKING.value, frame_path),
@@ -436,7 +436,8 @@ class MainWindow(QMainWindow):
                 index=False
             )
             self.update_metrics_table()
-            
+            self.tracking_results_tab.load_images()
+
             # Enable statistical analysis tab now that we have metrics data
             self.enable_statistical_analysis_tab()
         

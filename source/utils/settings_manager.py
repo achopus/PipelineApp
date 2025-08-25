@@ -60,6 +60,8 @@ class SettingsManager:
             "viz_border_size": 8,
             "viz_start_time": 0.0,
             "viz_end_time": float('inf'),
+            "viz_enabled": True,  # Enable/disable trajectory plotting
+            "viz_retry_attempts": 3,  # Number of retry attempts for saving plots
             
             # Cluster removal
             "cluster_removal_enabled": True,

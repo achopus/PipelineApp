@@ -1,10 +1,15 @@
 import numpy as np
 from pandas import DataFrame
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend to prevent GUI issues
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.collections import LineCollection
 from typing import Optional
 from utils.settings_manager import get_setting
+
+# Configure matplotlib for better memory management
+plt.ioff()  # Turn off interactive mode
 
 
 def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
@@ -39,49 +44,79 @@ def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
 
 def plot_trajectory_figure(df: DataFrame, save_path: str, arena_side_cm: Optional[float] = None,
                            start_time: Optional[float] = None, end_time: Optional[float] = None) -> None:
-    # Use settings if parameters not provided
-    if arena_side_cm is None:
-        arena_side_cm = float(get_setting("arena_side_cm", 80.0))
-    if start_time is None:
-        start_time = float(get_setting("viz_start_time", 0.0))
-    if end_time is None:
-        viz_end_time = get_setting("viz_end_time", float('inf'))
-        end_time = float('inf') if viz_end_time == float('inf') else viz_end_time
+    """Plot trajectory figure with robust error handling for network storage."""
+    fig = None
+    ax = None
+    line = None
     
-    df = df[(df['timestamps'] >= start_time) & (df['timestamps'] <= end_time)]
-    X, Y, T = df['x'].to_numpy(), df['y'].to_numpy(), df['timestamps'].to_numpy()
-    # Setup
-    fig, ax = plt.subplots()
-    plt.rcParams.update({'font.weight': 'normal', 'font.size': 14})
-    fig.set_size_inches((7.95, 7.3))
-    b = get_setting("viz_border_size", 8)
+    try:
+        # Use settings if parameters not provided
+        if arena_side_cm is None:
+            arena_side_cm = float(get_setting("arena_side_cm", 80.0))
+        if start_time is None:
+            start_time = float(get_setting("viz_start_time", 0.0))
+        if end_time is None:
+            viz_end_time = get_setting("viz_end_time", float('inf'))
+            end_time = float('inf') if viz_end_time == float('inf') else viz_end_time
+        
+        df = df[(df['timestamps'] >= start_time) & (df['timestamps'] <= end_time)]
+        X, Y, T = df['x'].to_numpy(), df['y'].to_numpy(), df['timestamps'].to_numpy()
+        
+        # Setup
+        fig, ax = plt.subplots()
+        plt.rcParams.update({'font.weight': 'normal', 'font.size': 14})
+        fig.set_size_inches((7.95, 7.3))
+        b = get_setting("viz_border_size", 8)
 
-    # Arena creation
-    rectangle_outer = patches.Rectangle((-b, -b), arena_side_cm + 2 * b, arena_side_cm + 2 * b, linewidth=1, edgecolor='black', facecolor='gray')
-    ax.add_patch(rectangle_outer)
-    rectangle_inner = patches.Rectangle((0, 0), arena_side_cm, arena_side_cm, linewidth=1, edgecolor='black', facecolor='gainsboro')
-    ax.add_patch(rectangle_inner)
-    plt.scatter([arena_side_cm / 2], [arena_side_cm / 2], marker='o', c='gray')
-    plt.plot([0, -b], [0, -b], c='black', linewidth=1)
-    plt.plot([arena_side_cm, arena_side_cm + b], [arena_side_cm, arena_side_cm + b], c='black', linewidth=1)
-    plt.plot([arena_side_cm, arena_side_cm + b], [0, -b], linewidth=1, color='black')
-    plt.plot([0, -b], [arena_side_cm, arena_side_cm + b], linewidth=1, color='black')
-    
-    # Trajectory
-    line = colored_line_between_pts(X, Y, T / 60, ax, linewidth=1.5, cmap='plasma', antialiased=True) # type: ignore
-    
-    # Writing
-    fig.colorbar(line, ax=ax, label="Time [min]", fraction=0.04)
-    plt.xticks(ticks=[0, arena_side_cm / 2, arena_side_cm], labels=[f"{-arena_side_cm / 2:.0f} cm", f"{0} cm", f"{arena_side_cm / 2:.0f} cm"])
-    plt.yticks(ticks=[0, arena_side_cm / 2, arena_side_cm], labels=[f"{-arena_side_cm / 2:.0f} cm", f"{0} cm", f"{arena_side_cm / 2:.0f} cm"])
-    ax.tick_params(axis='both', which='both', length=6, width=2)
+        # Arena creation
+        rectangle_outer = patches.Rectangle((-b, -b), arena_side_cm + 2 * b, arena_side_cm + 2 * b, linewidth=1, edgecolor='black', facecolor='gray')
+        ax.add_patch(rectangle_outer)
+        rectangle_inner = patches.Rectangle((0, 0), arena_side_cm, arena_side_cm, linewidth=1, edgecolor='black', facecolor='gainsboro')
+        ax.add_patch(rectangle_inner)
+        plt.scatter([arena_side_cm / 2], [arena_side_cm / 2], marker='o', c='gray')
+        plt.plot([0, -b], [0, -b], c='black', linewidth=1)
+        plt.plot([arena_side_cm, arena_side_cm + b], [arena_side_cm, arena_side_cm + b], c='black', linewidth=1)
+        plt.plot([arena_side_cm, arena_side_cm + b], [0, -b], linewidth=1, color='black')
+        plt.plot([0, -b], [arena_side_cm, arena_side_cm + b], linewidth=1, color='black')
+        
+        # Trajectory
+        line = colored_line_between_pts(X, Y, T / 60, ax, linewidth=1.5, cmap='plasma', antialiased=True) # type: ignore
+        
+        # Writing
+        fig.colorbar(line, ax=ax, label="Time [min]", fraction=0.04)
+        plt.xticks(ticks=[0, arena_side_cm / 2, arena_side_cm], labels=[f"{-arena_side_cm / 2:.0f} cm", f"{0} cm", f"{arena_side_cm / 2:.0f} cm"])
+        plt.yticks(ticks=[0, arena_side_cm / 2, arena_side_cm], labels=[f"{-arena_side_cm / 2:.0f} cm", f"{0} cm", f"{arena_side_cm / 2:.0f} cm"])
+        ax.tick_params(axis='both', which='both', length=6, width=2)
 
-    # Geometry
-    plt.axis('equal')
-    plt.xlim(-b-0.1, arena_side_cm+b+0.1)
-    plt.ylim(-b-0.1, arena_side_cm+b+0.1)
-    for spine in ax.spines.values():
-        spine.set_linewidth(3)  # Set the thickness of the border
+        # Geometry
+        plt.axis('equal')
+        plt.xlim(-b-0.1, arena_side_cm+b+0.1)
+        plt.ylim(-b-0.1, arena_side_cm+b+0.1)
+        for spine in ax.spines.values():
+            spine.set_linewidth(3)  # Set the thickness of the border
 
-    plt.savefig(save_path, dpi=600, bbox_inches='tight')
-    plt.close(fig)
+        # Save with error handling
+        plt.savefig(save_path, dpi=600, bbox_inches='tight')
+        
+    except Exception as e:
+        # Re-raise the exception so the calling function can handle retries
+        raise e
+        
+    finally:
+        # Always clean up matplotlib resources
+        try:
+            if fig is not None:
+                plt.close(fig)
+            plt.clf()
+            plt.cla()
+            
+            # Force garbage collection of matplotlib objects
+            if 'line' in locals() and line is not None:
+                del line
+            if 'ax' in locals() and ax is not None:
+                del ax
+            if 'fig' in locals() and fig is not None:
+                del fig
+                
+        except Exception:
+            pass  # Ignore cleanup errors

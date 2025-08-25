@@ -202,11 +202,11 @@ class TrackingResultsTab(QWidget):
         """)
         image_layout.addWidget(trajectory_title)
         
-        image_label = QLabel()
-        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        image_label.setMinimumSize(300, 200)
-        image_label.setStyleSheet("""
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.image_label.setMinimumSize(300, 200)
+        self.image_label.setStyleSheet("""
             QLabel {
                 background-color: #1a1a1a;
                 border: 2px dashed #666666;
@@ -217,9 +217,9 @@ class TrackingResultsTab(QWidget):
             }
         """)
         
-        file_label = QLabel()
-        file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        file_label.setStyleSheet("""
+        self.file_label = QLabel()
+        self.file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.file_label.setStyleSheet("""
             QLabel {
                 color: #e6f3f7;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -233,23 +233,23 @@ class TrackingResultsTab(QWidget):
             }
         """)
         
-        image_label_width = image_label.width()
-        image_label_height = image_label.height()
+        self.image_label_width = self.image_label.width()
+        self.image_label_height = self.image_label.height()
 
         # Center the labels by wrapping them in a widget
         label_container = QWidget()
         container_layout = QVBoxLayout()
         container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        container_layout.addWidget(file_label)
-        container_layout.addWidget(image_label)
+        container_layout.addWidget(self.file_label)
+        container_layout.addWidget(self.image_label)
         label_container.setLayout(container_layout)
 
         # Compact navigation
         nav_layout = QHBoxLayout()
         nav_layout.setSpacing(10)
         
-        def create_nav_button(text, icon):
-            button = QPushButton(f"{icon} {text}")
+        def create_nav_button(text, icon: Optional[str] = None):
+            button = QPushButton(f"{icon} {text}" if icon else text)
             button.setFixedSize(160, 45)
             button.setStyleSheet("""
                 QPushButton {
@@ -283,16 +283,16 @@ class TrackingResultsTab(QWidget):
             """)
             return button
             
-        prev_button = create_nav_button("Previous", "◀")
-        next_button = create_nav_button("Next", "▶")
+        prev_button = create_nav_button("◀ Previous")
+        next_button = create_nav_button("Next ▶")
         
         nav_layout.addStretch()
         nav_layout.addWidget(prev_button)
         nav_layout.addWidget(next_button)
         nav_layout.addStretch()
 
-        image_layout.addWidget(file_label)
-        image_layout.addWidget(image_label)
+        image_layout.addWidget(self.file_label)
+        image_layout.addWidget(self.image_label)
         image_layout.addLayout(nav_layout)
         image_viewer.setLayout(image_layout)
         left_layout.addWidget(image_viewer)
@@ -323,46 +323,17 @@ class TrackingResultsTab(QWidget):
         
         self.setLayout(main_layout)
 
-        # Image navigation logic
-        def load_images() -> None:
-            """Load images from the images folder."""
-            if self.parent_window and hasattr(self.parent_window, 'folder_path'):
-                image_path = os.path.join(self.parent_window.folder_path, Folder.IMAGES.value)
-                if os.path.exists(image_path):
-                    self.image_files = [f for f in os.listdir(image_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
-                    show_current_image()
-
-        def show_current_image() -> None:
-            """Display the current image in the image viewer."""
-            if self.image_files and self.parent_window and hasattr(self.parent_window, 'folder_path'):
-                image_path = os.path.join(self.parent_window.folder_path, Folder.IMAGES.value, self.image_files[self.current_image_index])
-                pixmap = QPixmap(image_path)
-                # Scale image to fit within a reasonable size while maintaining aspect ratio
-                # Use the actual widget size or fallback to reasonable defaults
-                widget_width = image_label_width
-                widget_height = image_label_height
-                
-                
-                scaled_pixmap = pixmap.scaled(
-                    widget_width - 100,  # Leave some margin
-                    widget_height - 100,  # Leave some margin
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                )
-                image_label.setPixmap(scaled_pixmap)
-                file_label.setText(self.image_files[self.current_image_index])
-
         def next_image():
             """Navigate to the next image."""
             if self.image_files:
                 self.current_image_index = (self.current_image_index + 1) % len(self.image_files)
-                show_current_image()
+                self.show_current_image()
 
         def prev_image():
             """Navigate to the previous image."""
             if self.image_files:
                 self.current_image_index = (self.current_image_index - 1) % len(self.image_files)
-                show_current_image()
+                self.show_current_image()
 
         next_button.clicked.connect(next_image)
         prev_button.clicked.connect(prev_image)
@@ -371,7 +342,7 @@ class TrackingResultsTab(QWidget):
             """Start the tracking process."""
             if self.parent_window and hasattr(self.parent_window, 'yaml_path'):
                 videos = [os.path.join(self.parent_window.folder_path, Folder.VIDEOS_PREPROCESSED.value, v) for v in os.listdir(os.path.join(self.parent_window.folder_path, Folder.VIDEOS_PREPROCESSED.value)) if self.parent_window.status[Path(v).stem] == Status.READY_TRACKING]
-                expected_runtime = tracking_runtime(videos)
+                expected_runtime = tracking_runtime(videos, n_parallel=5)
                 finish_time = datetime.now() + timedelta(seconds=expected_runtime)
                 QMessageBox.information(
                     self,
@@ -384,11 +355,41 @@ class TrackingResultsTab(QWidget):
             """Calculate metrics and load images."""
             if self.parent_window and hasattr(self.parent_window, 'metrics_pipeline_wrapper'):
                 self.parent_window.metrics_pipeline_wrapper()
-            load_images()
+            else:
+                self.load_images()
 
-        load_images()
+        self.load_images()
         btn_run_tracking.clicked.connect(run_tracking)
         btn_calculate_results.clicked.connect(calculate_results)
+
+        # Image navigation logic
+    def load_images(self) -> None:
+        """Load images from the images folder."""
+        if self.parent_window and hasattr(self.parent_window, 'folder_path'):
+            image_path = os.path.join(self.parent_window.folder_path, Folder.IMAGES.value)
+            if os.path.exists(image_path):
+                self.image_files = [f for f in os.listdir(image_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+                self.show_current_image()
+
+
+    def show_current_image(self) -> None:
+        """Display the current image in the image viewer."""
+        if self.image_files and self.parent_window and hasattr(self.parent_window, 'folder_path'):
+            image_path = os.path.join(self.parent_window.folder_path, Folder.IMAGES.value, self.image_files[self.current_image_index])
+            pixmap = QPixmap(image_path)
+            # Scale image to fit within a reasonable size while maintaining aspect ratio
+            # Use the actual widget size or fallback to reasonable defaults
+            widget_width = self.image_label_width
+            widget_height = self.image_label_height
+
+            scaled_pixmap = pixmap.scaled(
+                widget_width - 100,  # Leave some margin
+                widget_height - 100,  # Leave some margin
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.image_label.setPixmap(scaled_pixmap)
+            self.file_label.setText(self.image_files[self.current_image_index])
 
     def update_metrics_progress(self, i: int, n: int, video_name: str) -> None:
         """Update the metrics progress display."""

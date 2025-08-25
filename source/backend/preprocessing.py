@@ -118,11 +118,7 @@ class VideoPreprocessor:
                 writer.write(grayscale_frame)
                 frame_number += 1
                 
-                # Optional: Print progress
-                if frame_number % 100 == 0:
-                    print(f"Processed {frame_number}/{frame_count} frames")
             
-            print(f"Successfully transformed video: {output_path}")
             return output_path
             
         finally:

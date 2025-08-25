@@ -47,11 +47,10 @@ def extract_pose(
             destfolder=out_folder,
             batchsize=batch_size,
         )
-        print(f"Successfully analyzed video: {video_path}")
+
         
     except Exception as e:
         error_msg = f"Error analyzing video {video_path}: {str(e)}\n{traceback.format_exc()}"
-        print(error_msg)
         
         # Log error to file
         error_log_path = Path("error_log.txt")

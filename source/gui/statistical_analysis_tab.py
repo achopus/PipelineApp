@@ -24,7 +24,8 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QComboBox, QListWidget, QListWidgetItem, QTextEdit,
     QGroupBox, QTableWidget, QTableWidgetItem, QMessageBox,
-    QCheckBox, QSplitter, QProgressBar, QApplication, QScrollArea
+    QCheckBox, QSplitter, QProgressBar, QApplication, QScrollArea,
+    QFileDialog
 )
 
 
@@ -187,20 +188,33 @@ class StatisticalAnalysisWorker(QThread):
                             if len(anova_data) < 4:  # Need at least 4 observations for two-way ANOVA
                                 test_results = {'error': 'Two-way ANOVA requires at least 4 observations'}
                             else:
-                                # Create the formula for two-way ANOVA with interaction
-                                formula = f"{metric} ~ C({self.grouping_factor}) + C({self.grouping_factor2}) + C({self.grouping_factor}):C({self.grouping_factor2})"
+                                # Create safe column names for statsmodels (replace problematic characters)
+                                safe_metric = metric.replace('.', '_').replace(' ', '_').replace('-', '_')
+                                safe_factor1 = f"factor1"
+                                safe_factor2 = f"factor2"
+                                
+                                # Create a copy of the data with safe column names
+                                anova_data_safe = anova_data.copy()
+                                anova_data_safe = anova_data_safe.rename(columns={
+                                    metric: safe_metric,
+                                    self.grouping_factor: safe_factor1,
+                                    self.grouping_factor2: safe_factor2
+                                })
+                                
+                                # Create the formula for two-way ANOVA with interaction using safe names
+                                formula = f"{safe_metric} ~ C({safe_factor1}) + C({safe_factor2}) + C({safe_factor1}):C({safe_factor2})"
                                 
                                 # Fit the model
-                                model = ols(formula, data=anova_data).fit()
+                                model = ols(formula, data=anova_data_safe).fit()
                                 anova_table = anova_lm(model, typ=2)
                                 
-                                # Extract results with proper type handling
-                                f1_f = anova_table.loc[f'C({self.grouping_factor})', 'F']
-                                f1_p = anova_table.loc[f'C({self.grouping_factor})', 'PR(>F)']
-                                f2_f = anova_table.loc[f'C({self.grouping_factor2})', 'F']
-                                f2_p = anova_table.loc[f'C({self.grouping_factor2})', 'PR(>F)']
-                                int_f = anova_table.loc[f'C({self.grouping_factor}):C({self.grouping_factor2})', 'F']
-                                int_p = anova_table.loc[f'C({self.grouping_factor}):C({self.grouping_factor2})', 'PR(>F)']
+                                # Extract results with proper type handling using safe names
+                                f1_f = anova_table.loc[f'C({safe_factor1})', 'F']
+                                f1_p = anova_table.loc[f'C({safe_factor1})', 'PR(>F)']
+                                f2_f = anova_table.loc[f'C({safe_factor2})', 'F']
+                                f2_p = anova_table.loc[f'C({safe_factor2})', 'PR(>F)']
+                                int_f = anova_table.loc[f'C({safe_factor1}):C({safe_factor2})', 'F']
+                                int_p = anova_table.loc[f'C({safe_factor1}):C({safe_factor2})', 'PR(>F)']
                                 
                                 test_results = {
                                     'test_type': 'Two-way ANOVA',
@@ -318,10 +332,15 @@ class StatisticalAnalysisTab(QWidget):
         data_group = QGroupBox("Data Loading")
         data_layout = QVBoxLayout(data_group)
         
-        self.load_data_btn = QPushButton("Load Metrics Data")
-        self.load_data_btn.clicked.connect(self.load_metrics_data)
+        self.load_data_btn = QPushButton("Load Current Project")
+        self.load_data_btn.clicked.connect(self.load_current_project_data)
         self.load_data_btn.setMinimumHeight(self.scaling_manager.scale_size(40)) # type: ignore
         data_layout.addWidget(self.load_data_btn)
+        
+        self.load_multiple_btn = QPushButton("Load Multiple Projects")
+        self.load_multiple_btn.clicked.connect(self.load_multiple_projects_data)
+        self.load_multiple_btn.setMinimumHeight(self.scaling_manager.scale_size(40)) # type: ignore
+        data_layout.addWidget(self.load_multiple_btn)
         
         self.data_status_label = QLabel("No data loaded")
         self.data_status_label.setStyleSheet("color: #888; font-style: italic;")
@@ -523,7 +542,10 @@ class StatisticalAnalysisTab(QWidget):
         self.results_text.setText(
             "📋 Welcome to Statistical Analysis!\n\n"
             "Steps to get started:\n"
-            "1. Load metrics data from your project\n"
+            "1. Load metrics data:\n"
+            "   • Current Project: Load from currently open project\n"
+            "   • Multiple Projects: Select config.yaml files from multiple projects\n"
+            "     (projects must have matching filename structure and experiment type)\n"
             "2. Select a grouping factor (based on filename structure)\n"
             "3. Choose metrics to analyze\n"
             "4. Select appropriate statistical test\n"
@@ -542,7 +564,7 @@ class StatisticalAnalysisTab(QWidget):
         
         return scroll_area
     
-    def load_metrics_data(self) -> None:
+    def load_current_project_data(self) -> None:
         """Load metrics data from the current project."""
         try:
             if not self.parent_window or not hasattr(self.parent_window, 'folder_path'):
@@ -579,6 +601,113 @@ class StatisticalAnalysisTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load data: {str(e)}")
     
+    def load_multiple_projects_data(self) -> None:
+        """Load metrics data from multiple projects."""
+        try:
+            # Open file dialog to select multiple config.yaml files
+            file_dialog = QFileDialog()
+            file_dialog.setFileMode(QFileDialog.ExistingFiles)
+            file_dialog.setNameFilter("Config files (config.yaml)")
+            file_dialog.setWindowTitle("Select config.yaml files from projects to combine")
+            
+            if not file_dialog.exec_():
+                return
+            
+            selected_files = file_dialog.selectedFiles()
+            if not selected_files:
+                return
+            
+            # Load and validate all projects
+            all_dataframes = []
+            reference_config = None
+            project_names = []
+            
+            for yaml_path in selected_files:
+                try:
+                    # Load YAML configuration
+                    with open(yaml_path, 'r') as f:
+                        config = yaml.safe_load(f)
+                    
+                    # Get project folder (parent of config.yaml)
+                    project_folder = os.path.dirname(yaml_path)
+                    project_name = os.path.basename(project_folder)
+                    
+                    # Validate against first project's config
+                    if reference_config is None:
+                        reference_config = config
+                        self.yaml_config = config
+                    else:
+                        if not self._validate_compatible_config(reference_config, config):
+                            QMessageBox.critical(self, "Error", 
+                                f"Project '{project_name}' has incompatible configuration.\n"
+                                "All projects must have the same filename structure and experiment type.")
+                            return
+                    
+                    # Load metrics data from this project
+                    csv_path = os.path.join(project_folder, Folder.RESULTS.value, "metrics_dataframe.csv")
+                    if not os.path.exists(csv_path):
+                        QMessageBox.warning(self, "Warning", 
+                            f"No metrics data found in project '{project_name}'. Skipping this project.")
+                        continue
+                    
+                    df = pd.read_csv(csv_path)
+                    
+                    # Add project identifier column
+                    df['Project'] = project_name
+                    all_dataframes.append(df)
+                    project_names.append(project_name)
+                    
+                except Exception as e:
+                    QMessageBox.warning(self, "Warning", 
+                        f"Failed to load project from '{yaml_path}': {str(e)}")
+                    continue
+            
+            if not all_dataframes:
+                QMessageBox.warning(self, "Warning", "No valid projects were loaded.")
+                return
+            
+            # Combine all dataframes
+            self.metrics_dataframe = pd.concat(all_dataframes, ignore_index=True)
+            
+            # Extract grouping factors from filename structure
+            self.extract_grouping_factors()
+            
+            # Add 'Project' to grouping factors if not already present
+            if 'Project' not in self.grouping_factors:
+                self.grouping_factors.append('Project')
+            
+            # Update UI
+            self.update_data_status_multiple(project_names)
+            self.populate_metrics_list()
+            self.populate_factor_combo()
+            
+            self.analyze_btn.setEnabled(True)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load multiple projects: {str(e)}")
+    
+    def _validate_compatible_config(self, config1: Dict, config2: Dict) -> bool:
+        """Validate that two project configurations are compatible for combining."""
+        # Check filename structure
+        fs1 = config1.get('filename_structure', {})
+        fs2 = config2.get('filename_structure', {})
+        
+        if fs1.get('field_names') != fs2.get('field_names'):
+            return False
+        
+        if fs1.get('separator') != fs2.get('separator'):
+            return False
+        
+        # Check merge groups - they must be identical for projects to be compatible
+        if fs1.get('merge_groups', []) != fs2.get('merge_groups', []):
+            return False
+        
+        # Check experiment type
+        if config1.get('experiment_type') != config2.get('experiment_type'):
+            return False
+        
+        return True
+    
     def extract_grouping_factors(self) -> None:
         """Extract grouping factors from the dataframe columns."""
         self.grouping_factors = []
@@ -588,12 +717,16 @@ class StatisticalAnalysisTab(QWidget):
         
         filename_structure = self.yaml_config.get('filename_structure', {})
         field_names = filename_structure.get('field_names', [])
+        merge_groups = filename_structure.get('merge_groups', [])
         
         if not field_names:
             return
         
-        # Check if the field columns exist in the dataframe (they should if construct_metric_dataframe worked)
-        existing_fields = [field for field in field_names if field in self.metrics_dataframe.columns]
+        # Apply merge groups to get the actual field names that should be in the dataframe
+        merged_field_names = self._apply_merge_groups_to_field_names(field_names, merge_groups)
+        
+        # Check if the merged field columns exist in the dataframe
+        existing_fields = [field for field in merged_field_names if field in self.metrics_dataframe.columns]
         
         if existing_fields:
             self.grouping_factors = existing_fields
@@ -605,18 +738,64 @@ class StatisticalAnalysisTab(QWidget):
                 parts = base_name.split('_')
                 
                 if len(parts) == len(field_names):
-                    self.grouping_factors = field_names
+                    # Apply merge groups to the extracted parts to get the actual grouping factors
+                    self.grouping_factors = merged_field_names
                     # Add extracted factors as columns to dataframe
-                    for i, factor_name in enumerate(field_names):
-                        self.metrics_dataframe[factor_name] = self.metrics_dataframe['Filename'].apply(
-                            lambda x: os.path.splitext(x)[0].split('_')[i] if len(os.path.splitext(x)[0].split('_')) > i else ''
-                        )
+                    for merged_name in merged_field_names:
+                        if merged_name not in self.metrics_dataframe.columns:
+                            # This is a simplified fallback - in practice, the dataframe should already have these columns
+                            # from the metrics calculation pipeline
+                            self.metrics_dataframe[merged_name] = "Unknown"
+    
+    def _apply_merge_groups_to_field_names(self, field_names: list[str], merge_groups: list[list[int]]) -> list[str]:
+        """Apply merge groups to field names to get the final column names that should exist in the dataframe."""
+        if not merge_groups:
+            return field_names
+        
+        # Create sets to track which indices are merged
+        merged_indices = set()
+        for group in merge_groups:
+            merged_indices.update(group)
+        
+        merged_field_names = []
+        
+        # Add merged groups first
+        for group in merge_groups:
+            group_names = [field_names[i] for i in group if i < len(field_names)]
+            merged_name = "_".join(group_names)
+            merged_field_names.append(merged_name)
+        
+        # Add non-merged fields
+        for i, name in enumerate(field_names):
+            if i not in merged_indices:
+                merged_field_names.append(name)
+        
+        return merged_field_names
     
     def update_data_status(self) -> None:
         """Update the data status label."""
         if self.metrics_dataframe is not None:
             n_rows, n_cols = self.metrics_dataframe.shape
             self.data_status_label.setText(f"✅ Loaded: {n_rows} files, {n_cols-1} metrics")
+            self.data_status_label.setStyleSheet("color: #4CAF50;")
+        else:
+            self.data_status_label.setText("❌ No data loaded")
+            self.data_status_label.setStyleSheet("color: #f44336;")
+    
+    def update_data_status_multiple(self, project_names: List[str]) -> None:
+        """Update the data status label for multiple projects."""
+        if self.metrics_dataframe is not None:
+            n_rows, n_cols = self.metrics_dataframe.shape
+            n_projects = len(project_names)
+            project_list = ", ".join(project_names[:3])  # Show first 3 projects
+            if n_projects > 3:
+                project_list += f" (+{n_projects-3} more)"
+            
+            self.data_status_label.setText(
+                f"✅ Loaded: {n_rows} files from {n_projects} projects\n"
+                f"Projects: {project_list}\n"
+                f"Metrics: {n_cols-1} columns"
+            )
             self.data_status_label.setStyleSheet("color: #4CAF50;")
         else:
             self.data_status_label.setText("❌ No data loaded")

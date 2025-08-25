@@ -59,8 +59,8 @@ class VideoPointsWidget(QWidget):
 
         # Buttons for video navigation
         btn_layout = QHBoxLayout()
-        self.btn_prev = QPushButton("<<< Previous Video")
-        self.btn_next = QPushButton("Next Video >>>")
+        self.btn_prev = QPushButton("◀ Previous Video")
+        self.btn_next = QPushButton("Next Video ▶")
         self.btn_save = QPushButton("Save")
         
         # Scale buttons based on screen size

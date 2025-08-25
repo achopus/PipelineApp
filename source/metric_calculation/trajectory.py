@@ -35,9 +35,7 @@ def gaussian_blur_nan(y: NDArray, sigma: float) -> NDArray:
 
 def calculate_timestamps(dataframe_path: str, source_video_path: str) -> DataFrame:
     assert os.path.exists(dataframe_path) and os.path.exists(source_video_path), "Dataframe or video path does not exist."
-    
     df = pd.read_csv(dataframe_path, header=[1, 2]) # DLC specific data saving
-    
     cap = cv2.VideoCapture(source_video_path)
     fps = float(cap.get(cv2.CAP_PROP_FPS))
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
