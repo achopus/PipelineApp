@@ -2,8 +2,8 @@
 
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 2, 0, 0),
+    prodvers=(1, 2, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -19,12 +19,12 @@ VSVersionInfo(
           [
             StringStruct(u'CompanyName', u'Video Tracking Pipeline'),
             StringStruct(u'FileDescription', u'Video Tracking Pipeline Application'),
-            StringStruct(u'FileVersion', u'1.0.0.0'),
+            StringStruct(u'FileVersion', u'1.2.0.0'),
             StringStruct(u'InternalName', u'PipelineApp'),
             StringStruct(u'LegalCopyright', u'© 2025 Video Tracking Pipeline'),
             StringStruct(u'OriginalFilename', u'PipelineApp.exe'),
             StringStruct(u'ProductName', u'PipelineApp'),
-            StringStruct(u'ProductVersion', u'1.0.0.0'),
+            StringStruct(u'ProductVersion', u'1.2.0.0'),
           ]
         )
       ]

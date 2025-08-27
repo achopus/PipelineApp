@@ -62,8 +62,9 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'tkinter',  # Exclude tkinter if not needed
-        'matplotlib.backends.backend_tkagg',  # Exclude tk backend
+        'backend',  # Exclude the backend module as specified
+        'backend.extract_pose',  # Exclude backend submodules
+        'backend.preprocessing',  # Exclude backend submodules
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
