@@ -8,19 +8,22 @@ pre-trained DeepLabCut models on cluster environments.
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import Optional
+from typing import List
+
+from datetime import datetime
 
 import deeplabcut  # pyright: ignore[reportMissingImports]
 
 
 def extract_pose(
     config_path: str,
-    video_path: str,
+    video_path: List[str],
     video_type: str = ".mp4",
     out_folder: str = "paths",
     shuffle: int = 1,
     batch_size: int = 16,
     save_as_csv: bool = True,
+    array_index: int = 0
 ) -> None:
     """
     Extract pose data from a video using DeepLabCut.
@@ -40,20 +43,19 @@ def extract_pose(
     try:
         deeplabcut.analyze_videos(
             config=config_path,
-            videos=[video_path],
+            videos=video_path,
             videotype=video_type,
             shuffle=shuffle,
             save_as_csv=save_as_csv,
             destfolder=out_folder,
             batchsize=batch_size,
         )
-
         
     except Exception as e:
         error_msg = f"Error analyzing video {video_path}: {str(e)}\n{traceback.format_exc()}"
         
         # Log error to file
-        error_log_path = Path("error_log.txt")
+        error_log_path = Path(f"error_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
         with open(error_log_path, "a", encoding="utf-8") as f:
             f.write(f"\n{error_msg}\n")
         raise
@@ -62,8 +64,7 @@ def extract_pose(
 def create_argument_parser() -> ArgumentParser:
     """Create and configure argument parser for command line interface."""
     parser = ArgumentParser(
-        description="Extract pose data from videos using DeepLabCut",
-        formatter_class=ArgumentParser.__dict__.get("ArgumentDefaultsHelpFormatter", ArgumentParser)
+        description="Extract pose data from videos using DeepLabCut"
     )
     
     parser.add_argument(
@@ -109,28 +110,41 @@ def create_argument_parser() -> ArgumentParser:
         choices=[0, 1],
         help="Save results as CSV (1) or not (0)"
     )
+    parser.add_argument(
+        "--array_index",
+        type=int,
+        default=0,
+        help="Array index for video selection"
+    )
     
     return parser
 
 
 def main() -> None:
     """Main entry point for the pose extraction script."""
+
     parser = create_argument_parser()
     args = parser.parse_args()
-    
+    videos = args.video_path.split(":::")
+
     # Create output directory if it doesn't exist
     Path(args.out_folder).mkdir(parents=True, exist_ok=True)
     
     extract_pose(
         config_path=args.config_path,
-        video_path=args.video_path,
+        video_path=videos,
         video_type=args.video_type,
         out_folder=args.out_folder,
         shuffle=args.shuffle,
         batch_size=args.batch_size,
         save_as_csv=bool(args.save_as_csv),
+        array_index=args.array_index
     )
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        with open("error_log.txt", "a") as f:
+            f.write(f"Error occurred: {e}\n")

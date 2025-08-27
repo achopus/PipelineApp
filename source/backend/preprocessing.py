@@ -118,7 +118,6 @@ class VideoPreprocessor:
                 writer.write(grayscale_frame)
                 frame_number += 1
                 
-            
             return output_path
             
         finally:
@@ -129,8 +128,7 @@ class VideoPreprocessor:
 def create_argument_parser() -> ArgumentParser:
     """Create and configure argument parser for command line interface."""
     parser = ArgumentParser(
-        description="Transform video perspective and convert to grayscale",
-        formatter_class=ArgumentParser.__dict__.get("ArgumentDefaultsHelpFormatter", ArgumentParser)
+        description="Transform video perspective and convert to grayscale"
     )
     
     parser.add_argument(
@@ -191,10 +189,10 @@ def main() -> None:
             corners_path=args.corners,
             output_folder=args.folder_out
         )
-        print(f"Video preprocessing completed successfully: {output_path}")
-        
+
     except Exception as e:
-        print(f"Error during video preprocessing: {e}")
+        with open("error_log.txt", "a") as log_file:
+            log_file.write(f"Error occurred in main: {e}\n")
         raise
 
 
