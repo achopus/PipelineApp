@@ -46,27 +46,69 @@ class FileCopyWorker(QThread):
     def cancel(self):
         """Cancel the file copying operation."""
         self.should_cancel = True
+        self.requestInterruption()  # Request QThread interruption for faster response
     
     def run(self):
         """Run the file copying process."""
         try:
             for i, video_file in enumerate(self.files_to_copy):
-                if self.should_cancel:
+                if self.should_cancel or self.isInterruptionRequested():
                     return
                 
                 # Emit progress update
                 self.progress_update.emit(i, len(self.files_to_copy), video_file)
                 
-                # Copy the file
+                # Copy the file with cancellation support
                 source_path = os.path.join(self.source_folder, video_file)
                 dest_path = os.path.join(self.dest_folder, video_file)
-                shutil_copy(source_path, dest_path)
+                
+                if not self._copy_file_with_cancel_check(source_path, dest_path):
+                    # Copy was cancelled, clean up partial file if it exists
+                    if os.path.exists(dest_path):
+                        try:
+                            os.remove(dest_path)
+                        except OSError:
+                            pass  # Ignore cleanup errors
+                    return
             
             # Emit completion signal
             self.copy_complete.emit()
             
         except Exception as e:
             self.error_occurred.emit(f"Error copying files: {str(e)}")
+    
+    def _copy_file_with_cancel_check(self, source_path: str, dest_path: str, chunk_size: int = 4*1024*1024) -> bool:
+        """
+        Copy a file in chunks while checking for cancellation.
+        
+        Args:
+            source_path: Source file path
+            dest_path: Destination file path
+            chunk_size: Size of each chunk to copy (default 1MB)
+            
+        Returns:
+            bool: True if copy completed, False if cancelled
+        """
+        try:
+            with open(source_path, 'rb') as src_file:
+                with open(dest_path, 'wb') as dest_file:
+                    while True:
+                        # Check for cancellation before each chunk
+                        if self.should_cancel or self.isInterruptionRequested():
+                            return False
+                        
+                        # Read and copy chunk
+                        chunk = src_file.read(chunk_size)
+                        if not chunk:
+                            break  # End of file
+                        
+                        dest_file.write(chunk)
+                        
+            return True
+            
+        except Exception:
+            # Re-raise the exception to be handled by the main run method
+            raise
 
 
 class MergeGroupDialog(QDialog):
@@ -744,8 +786,23 @@ def _copy_files_threaded(source_folder: str, dest_folder: str, files_to_copy: li
     copy_worker.start()
     result = progress_dialog.exec_()  # This blocks until dialog is closed
     
-    # Wait for worker to finish
-    copy_worker.wait()
+    # Handle dialog close - cancel worker if still running
+    if copy_worker.isRunning():
+        copy_worker.cancel()
+        # Give worker time to respond to cancellation, but don't block indefinitely
+        if not copy_worker.wait(3000):  # Wait max 3 seconds
+            # Force terminate if it doesn't respond
+            copy_worker.terminate()
+            copy_worker.wait(1000)  # Wait for termination
+    
+    # Disconnect signals to ensure clean shutdown
+    try:
+        copy_worker.progress_update.disconnect()
+        copy_worker.copy_complete.disconnect()
+        copy_worker.error_occurred.disconnect()
+    except (RuntimeError, TypeError):
+        # Signals may already be disconnected or worker may be destroyed
+        pass
     
     # Handle results
     if copy_error[0]:
