@@ -177,7 +177,7 @@ Design your filename structure to match your experimental factors:
 - Center defined as central 40% of arena
 - Thigmotaxis zone: outer 20% of arena
 
-## � Best Practices
+## Best Practices
 
 ### **Project Organization**
 1. Use descriptive project names

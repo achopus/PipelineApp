@@ -90,8 +90,8 @@ class ManualDialog(QDialog):
                 border-radius: 6px;
                 padding: 16px;
                 font-family: 'Segoe UI', 'Consolas', sans-serif;
-                font-size: 13px;
-                line-height: 1.6;
+                font-size: 18px;
+                line-height: 1;
                 selection-background-color: #264f78;
                 selection-color: #ffffff;
             }

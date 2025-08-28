@@ -125,56 +125,68 @@ class StatisticalAnalysisWorker(QThread):
                     # One-way ANOVA
                     valid_groups = [group for group in group_values if len(group) > 0]
                     if len(valid_groups) >= 2:
-                        try:
-                            f_stat, p_value = f_oneway(*valid_groups)
-                            
-                            test_results = {
-                                'test_type': 'One-way ANOVA',
-                                'statistic': f_stat,
-                                'p_value': p_value,
-                                'significant': p_value < 0.05,
-                                'df_between': len(valid_groups) - 1,
-                                'df_within': sum(len(group) for group in valid_groups) - len(valid_groups)
-                            }
-                            
-                            # Add Tukey's HSD if ANOVA is significant and statsmodels is available
-                            if p_value < 0.05 and STATSMODELS_AVAILABLE and len(valid_groups) > 2:
-                                try:
-                                    # Prepare data for Tukey's test
-                                    tukey_data = []
-                                    tukey_groups = []
-                                    
-                                    for group_name, group_data in zip(group_names, group_values):
-                                        if len(group_data) > 0:
-                                            tukey_data.extend(group_data)
-                                            tukey_groups.extend([group_name] * len(group_data))
-                                    
-                                    # Perform Tukey's HSD
-                                    tukey_result = pairwise_tukeyhsd(endog=tukey_data, groups=tukey_groups, alpha=0.05)
-                                    
-                                    # Extract pairwise comparisons using summary method
-                                    tukey_summary = []
-                                    tukey_table = tukey_result.summary().data[1:]  # Skip header row
-                                    
-                                    for row in tukey_table:
-                                        if len(row) >= 6:  # Ensure we have all columns
-                                            tukey_summary.append({
-                                                'group1': str(row[0]),
-                                                'group2': str(row[1]),
-                                                'meandiff': float(row[2]),
-                                                'p_adj': float(row[3]),
-                                                'lower': float(row[4]),
-                                                'upper': float(row[5]),
-                                                'significant': str(row[6]).lower() in ['true', 'reject']
-                                            })
-                                    
-                                    test_results['tukey_hsd'] = tukey_summary
-                                    
-                                except Exception as tukey_error:
-                                    test_results['tukey_error'] = f'Tukey HSD failed: {str(tukey_error)}'
-                            
-                        except Exception as e:
-                            test_results = {'error': f'ANOVA failed: {str(e)}'}
+                        # Check if we have sufficient data for ANOVA (at least one group with > 1 observation)
+                        group_sizes = [len(group) for group in valid_groups]
+                        if max(group_sizes) <= 1:
+                            test_results = {'error': 'ANOVA requires at least one group with more than 1 observation'}
+                        else:
+                            try:
+                                f_stat, p_value = f_oneway(*valid_groups)
+                                
+                                # Ensure proper data types and handle NaN values
+                                f_stat_float = float(f_stat)
+                                p_value_float = float(p_value)
+                                is_significant = (p_value_float < 0.05) and not np.isnan(p_value_float)
+                                
+                                test_results = {
+                                    'test_type': 'One-way ANOVA',
+                                    'statistic': f_stat_float,
+                                    'p_value': p_value_float,
+                                    'significant': is_significant,
+                                    'df_between': len(valid_groups) - 1,
+                                    'df_within': sum(len(group) for group in valid_groups) - len(valid_groups)
+                                }
+                                
+                                # Add Tukey's HSD if ANOVA is significant and statsmodels is available
+                                if is_significant and STATSMODELS_AVAILABLE and len(valid_groups) > 2:
+                                    try:
+                                        # Prepare data for Tukey's test
+                                        tukey_data = []
+                                        tukey_groups = []
+                                        
+                                        for group_name, group_data in zip(group_names, group_values):
+                                            if len(group_data) > 0:
+                                                tukey_data.extend(group_data)
+                                                tukey_groups.extend([group_name] * len(group_data))
+                                        
+                                        # Perform Tukey's HSD
+                                        tukey_result = pairwise_tukeyhsd(endog=tukey_data, groups=tukey_groups, alpha=0.05)
+                                        
+                                        # Extract pairwise comparisons using summary method
+                                        tukey_summary = []
+                                        tukey_table = tukey_result.summary().data[1:]  # Skip header row
+                                        
+                                        for row in tukey_table:
+                                            if len(row) >= 7:  # Ensure we have all columns including reject
+                                                tukey_summary.append({
+                                                    'group1': str(row[0]),
+                                                    'group2': str(row[1]),
+                                                    'meandiff': float(row[2]),
+                                                    'p_adj': float(row[3]),
+                                                    'lower': float(row[4]),
+                                                    'upper': float(row[5]),
+                                                    'significant': row[6].lower() == 'true'  # row[6] is already a boolean
+                                                })
+                                        
+                                        test_results['tukey_hsd'] = tukey_summary
+                                        
+                                    except Exception as tukey_error:
+                                        test_results['tukey_error'] = f'Tukey HSD failed: {str(tukey_error)}'
+                                
+                            except Exception as e:
+                                test_results = {'error': f'ANOVA failed: {str(e)}'}
+                    else:
+                        test_results = {'error': 'Need at least 2 groups for ANOVA'}
                 
                 elif self.test_type == "Two-way ANOVA" and self.grouping_factor2:
                     # Two-way ANOVA with interaction
@@ -505,25 +517,28 @@ class StatisticalAnalysisTab(QWidget):
         table_layout = QVBoxLayout(table_group)
         
         self.results_table = QTableWidget()
-        self.results_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #3c3f41;
-                border: 1px solid #555;
-                border-radius: 5px;
-                gridline-color: #555;
-            }
-            QTableWidget::item {
-                padding: 5px;
-                border: none;
-            }
-            QHeaderView::section {
-                background-color: #555;
-                color: #f0f0f0;
-                font-weight: bold;
-                padding: 5px;
-                border: none;
-            }
-        """)
+        if False:
+            self.results_table.setStyleSheet("""
+                QTableWidget {
+                    border: 1px solid #555;
+                    border-radius: 5px;
+                    gridline-color: #555;
+                }
+                QTableWidget::item {
+                    padding: 5px;
+                    border: none;
+                }
+                QTableWidget::item:selected {
+                    background-color: #4a90e2;
+                }
+                QHeaderView::section {
+                    background-color: #555;
+                    color: #f0f0f0;
+                    font-weight: bold;
+                    padding: 5px;
+                    border: none;
+                }
+            """)
         
         self.results_table.verticalHeader().setVisible(False) # type: ignore
         table_layout.addWidget(self.results_table)
@@ -1065,9 +1080,6 @@ class StatisticalAnalysisTab(QWidget):
                 summary_text += f"  • p-value: {p_value:.6f}\n"
                 summary_text += f"  • Significant: {'YES' if significant else 'NO'} (α = 0.05)\n"
                 
-                if significant:
-                    significant_count += 1
-                
                 # Additional info for t-test
                 if 'levene_p' in test_results:
                     levene_p = test_results['levene_p']
@@ -1089,7 +1101,7 @@ class StatisticalAnalysisTab(QWidget):
                         group2 = comparison['group2']
                         meandiff = comparison['meandiff']
                         p_adj = comparison['p_adj']
-                        significant = comparison['significant']
+                        significant = float(p_adj) < 0.05
                         lower = comparison['lower']
                         upper = comparison['upper']
                         
@@ -1250,20 +1262,52 @@ class StatisticalAnalysisTab(QWidget):
             for col_idx, column in enumerate(columns):
                 value = row_data.get(column, "")
                 item = QTableWidgetItem(str(value))
-                
-                # Color significant results
-                if column == 'Significant' and value == 'Yes':
-                    item.setBackground(QColor(0, 255, 0))  # green
-                    item.setForeground(QColor(255, 255, 255))  # white
-                elif column == 'Significant' and value == 'No':
-                    item.setBackground(QColor(139, 0, 0))  # dark red
-                    item.setForeground(QColor(255, 255, 255))  # white
-                
-                # Note: Item will be editable by default, but functionality should work
                 self.results_table.setItem(row_idx, col_idx, item)
+        
+        # Apply significance coloring using the same approach as project_management_tab
+        self.color_significance_cells()
         
         # Resize columns to content
         self.results_table.resizeColumnsToContents()
+    
+    def color_significance_cells(self) -> None:
+        """Apply background colors to significance cells based on Yes/No values."""
+        if not self.results_table:
+            return
+            
+        # Find the 'Significant' column index
+        significant_col_idx = None
+        for col in range(self.results_table.columnCount()):
+            header_item = self.results_table.horizontalHeaderItem(col)
+            if header_item and header_item.text() == 'Significant':
+                significant_col_idx = col
+                break
+        
+        if significant_col_idx is None:
+            return  # No 'Significant' column found
+        
+        # Apply colors to significance cells
+        for row in range(self.results_table.rowCount()):
+            significant_item = self.results_table.item(row, significant_col_idx)
+            if significant_item:
+                significance_value = significant_item.text().strip()
+                
+                # Force the background color by creating a new item with the color
+                cell_text = significant_item.text()
+                new_item = QTableWidgetItem(cell_text)
+                
+                if significance_value == 'Yes':
+                    # Green background for significant results
+                    new_item.setBackground(QColor(34, 139, 34))  # Forest green
+                    new_item.setForeground(QColor(255, 255, 255))  # White text
+                elif significance_value == 'No':
+                    # Red background for non-significant results  
+                    new_item.setBackground(QColor(139, 0, 0))  # Dark red
+                    new_item.setForeground(QColor(255, 255, 255))  # White text
+                
+                # Force the item to ignore stylesheets for background
+                new_item.setFlags(significant_item.flags())
+                self.results_table.setItem(row, significant_col_idx, new_item)
     
     def export_results(self) -> None:
         """Export analysis results to file."""

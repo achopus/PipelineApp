@@ -546,6 +546,7 @@ class ProjectManagementTab(QWidget):
             self.table.setItem(row, 1, processing_item)
             
         self.color_status_rows()
+        self.table.resizeColumnsToContents()
 
     def color_status_rows(self) -> None:
         """Apply background colors to rows in table based on processing status."""

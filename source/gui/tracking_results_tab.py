@@ -415,6 +415,8 @@ class TrackingResultsTab(QWidget):
                     item = QTableWidgetItem(str(value))
                     # Note: Item will be editable by default, but functionality should work
                     self.metrics_table.setItem(j, i, item)
+                    
+            self.metrics_table.resizeColumnsToContents()
 
     def check_preprocessing_status(self, yaml_path: str) -> None:
         """Check and display the preprocessing status of files."""
